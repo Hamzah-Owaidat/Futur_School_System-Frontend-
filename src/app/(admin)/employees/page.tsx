@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReusableTable, { Column, ActionHandlers } from "@/components/tables/ReusableTable";
 import { ToggleSwitch } from "@/components/ui/toggle/ToggleSwitch";
 import { Modal } from "@/components/ui/modal";
@@ -8,107 +8,7 @@ import { useModal } from "@/hooks/useModal";
 import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
-
-// Employee interface based on the provided data structure
-interface Employee {
-  employee_code: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  date_of_birth: string;
-  gender: string;
-  address: string;
-  hire_date: string;
-  salary: string;
-  role_id: number;
-  is_active: number;
-  created_by: number;
-  updated_by: number;
-  created_at: string;
-  updated_at: string;
-  role_name: string;
-}
-
-// Mock data - Replace this with actual API call
-const mockEmployees: Employee[] = [
-  {
-    employee_code: "EMP001",
-    first_name: "John",
-    last_name: "Doe",
-    email: "john.doe@futurschool.com",
-    phone: "123-456-7890",
-    date_of_birth: "1989-12-31T22:00:00.000Z",
-    gender: "male",
-    address: "123 Main St",
-    hire_date: "2023-12-31T22:00:00.000Z",
-    salary: "50000.00",
-    role_id: 2,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T14:10:15.000Z",
-    updated_at: "2025-12-03T14:10:15.000Z",
-    role_name: "teacher",
-  },
-  {
-    employee_code: "EMP002",
-    first_name: "Jane",
-    last_name: "Smith",
-    email: "jane.smith@futurschool.com",
-    phone: "234-567-8901",
-    date_of_birth: "1990-05-15T22:00:00.000Z",
-    gender: "female",
-    address: "456 Oak Ave",
-    hire_date: "2023-11-15T22:00:00.000Z",
-    salary: "55000.00",
-    role_id: 2,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T14:10:15.000Z",
-    updated_at: "2025-12-03T14:10:15.000Z",
-    role_name: "teacher",
-  },
-  {
-    employee_code: "EMP003",
-    first_name: "Bob",
-    last_name: "Johnson",
-    email: "bob.johnson@futurschool.com",
-    phone: "345-678-9012",
-    date_of_birth: "1985-08-20T22:00:00.000Z",
-    gender: "male",
-    address: "789 Pine Rd",
-    hire_date: "2023-10-01T22:00:00.000Z",
-    salary: "60000.00",
-    role_id: 1,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T14:10:15.000Z",
-    updated_at: "2025-12-03T14:10:15.000Z",
-    role_name: "admin",
-  },
-  {
-    employee_code: "EMP004",
-    first_name: "Alice",
-    last_name: "Williams",
-    email: "alice.williams@futurschool.com",
-    phone: "456-789-0123",
-    date_of_birth: "1992-03-10T22:00:00.000Z",
-    gender: "female",
-    address: "321 Elm St",
-    hire_date: "2024-01-15T22:00:00.000Z",
-    salary: "48000.00",
-    role_id: 2,
-    is_active: 0,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T14:10:15.000Z",
-    updated_at: "2025-12-03T14:10:15.000Z",
-    role_name: "teacher",
-  },
-];
+import { employeeApi, Employee } from "@/lib/api/employees";
 
 // Format date helper
 const formatDate = (dateString: string): string => {
@@ -132,15 +32,37 @@ const formatCurrency = (amount: string): string => {
 };
 
 export default function EmployeesPage() {
-  // TODO: Replace with actual data fetching
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const addModal = useModal();
   const editModal = useModal();
 
+  // Fetch employees from API
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await employeeApi.getAll();
+        setEmployees(data);
+      } catch (err: any) {
+        console.error("Failed to fetch employees:", err);
+        setError(err?.message || "Failed to load employees");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
+
   // Handle toggle active status
   const handleToggleActive = (employeeCode: string, newStatus: boolean) => {
+    // Optimistic UI update
     setEmployees((prev) =>
       prev.map((emp) =>
         emp.employee_code === employeeCode
@@ -148,8 +70,21 @@ export default function EmployeesPage() {
           : emp
       )
     );
-    // TODO: Call API to update employee status
-    // updateEmployeeStatus(employeeCode, newStatus ? 1 : 0);
+
+    // Persist change to API
+    employeeApi
+      .updateStatus(employeeCode, newStatus)
+      .catch((err) => {
+        console.error("Failed to update employee status:", err);
+        setEmployees((prev) =>
+          prev.map((emp) =>
+            emp.employee_code === employeeCode
+              ? { ...emp, is_active: newStatus ? 0 : 1 }
+              : emp
+          )
+        );
+        alert(err?.message || "Failed to update employee status");
+      });
   };
 
   // Handle add employee
@@ -169,17 +104,44 @@ export default function EmployeesPage() {
   // Handle save employee (both add and edit)
   const handleSaveEmployee = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    // TODO: Call API to save employee
-    console.log("Saving employee:", Object.fromEntries(formData));
-    
-    // Close modal
-    if (isEditMode) {
-      editModal.closeModal();
-    } else {
-      addModal.closeModal();
-    }
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+
+    const saveEmployee = async () => {
+      try {
+        setIsSaving(true);
+        setError(null);
+
+        if (isEditMode && selectedEmployee) {
+          // Update existing employee
+          const updated = await employeeApi.update(
+            selectedEmployee.employee_code,
+            payload as any
+          );
+          setEmployees((prev) =>
+            prev.map((emp) =>
+              emp.employee_code === updated.employee_code ? updated : emp
+            )
+          );
+          editModal.closeModal();
+        } else {
+          // Create new employee
+          const created = await employeeApi.create(payload as any);
+          setEmployees((prev) => [created, ...prev]);
+          addModal.closeModal();
+          form.reset();
+        }
+      } catch (err: any) {
+        console.error("Failed to save employee:", err);
+        setError(err?.message || "Failed to save employee");
+        alert(err?.message || "Failed to save employee");
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    void saveEmployee();
   };
 
   // Column definitions
@@ -314,15 +276,26 @@ export default function EmployeesPage() {
       handleEditEmployee(employee);
     },
     onDelete: (employee) => {
-      console.log("Delete employee:", employee);
-      // TODO: Show confirmation dialog and delete
       if (
         confirm(
           `Are you sure you want to delete ${employee.first_name} ${employee.last_name}?`
         )
       ) {
-        // TODO: Perform delete operation
-        alert(`Deleted: ${employee.employee_code}`);
+        const deleteEmployee = async () => {
+          try {
+            await employeeApi.delete(employee.employee_code);
+            setEmployees((prev) =>
+              prev.filter(
+                (emp) => emp.employee_code !== employee.employee_code
+              )
+            );
+          } catch (err: any) {
+            console.error("Failed to delete employee:", err);
+            alert(err?.message || "Failed to delete employee");
+          }
+        };
+
+        void deleteEmployee();
       }
     },
     onCopyId: (employee) => {
@@ -365,6 +338,11 @@ export default function EmployeesPage() {
       </div>
 
       {/* Employees Table */}
+      {error && (
+        <p className="text-sm" style={{ color: "var(--theme-text-error, #f04438)" }}>
+          {error}
+        </p>
+      )}
       <ReusableTable
         data={employees}
         columns={columns}
@@ -429,7 +407,7 @@ export default function EmployeesPage() {
               <Button type="button" variant="outline" onClick={addModal.closeModal}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" disabled={isSaving}>
                 Add Employee
               </Button>
             </div>
@@ -541,7 +519,7 @@ export default function EmployeesPage() {
               <Button type="button" variant="outline" onClick={editModal.closeModal}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" disabled={isSaving}>
                 Update Employee
               </Button>
             </div>

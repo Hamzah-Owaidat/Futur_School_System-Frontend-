@@ -1,4 +1,5 @@
 "use client";
+
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -6,10 +7,93 @@ import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api/axios";
+import { useToast } from "@/components/ui/toast/ToastProvider";
+import type { ApiError } from "@/lib/api/axios";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  const validate = () => {
+    let valid = true;
+    setEmailError(null);
+    setPasswordError(null);
+
+    if (!email.trim()) {
+      setEmailError("Email is required.");
+      valid = false;
+    }
+
+    if (!password.trim()) {
+      setPasswordError("Password is required.");
+      valid = false;
+    }
+
+    return valid;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    try {
+      setIsSubmitting(true);
+
+      const response = await api.post<{
+        employee: any;
+        token: string;
+      }>("/auth/login", {
+        email,
+        password,
+      });
+
+      const payload: any = response.data;
+      const data = payload?.data ?? payload;
+
+      if (typeof window !== "undefined") {
+        if (data?.token) {
+          localStorage.setItem("token", data.token);
+        }
+        if (data?.employee) {
+          localStorage.setItem("user", JSON.stringify(data.employee));
+        }
+      }
+
+      showToast({
+        type: "success",
+        message: payload?.message || "Login successful.",
+      });
+
+      router.push("/");
+    } catch (error: any) {
+      const apiError = error as ApiError;
+
+      if (apiError.status === 401) {
+        showToast({
+          type: "error",
+          message: apiError.message || "Invalid email or password.",
+        });
+        setPasswordError("Invalid email or password.");
+      } else {
+        showToast({
+          type: "error",
+          message: apiError.message || "Something went wrong while signing in.",
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
@@ -84,13 +168,20 @@ export default function SignInForm() {
                 </span>
               </div>
             </div>
-            <form>
+            <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input placeholder="info@gmail.com" type="email" />
+                  <Input
+                    placeholder="info@gmail.com"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    error={!!emailError}
+                    hint={emailError || undefined}
+                  />
                 </div>
                 <div>
                   <Label>
@@ -100,6 +191,10 @@ export default function SignInForm() {
                     <Input
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      error={!!passwordError}
+                      hint={passwordError || undefined}
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
@@ -128,7 +223,7 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm">
+                  <Button className="w-full" size="sm" disabled={isSubmitting}>
                     Sign in
                   </Button>
                 </div>
