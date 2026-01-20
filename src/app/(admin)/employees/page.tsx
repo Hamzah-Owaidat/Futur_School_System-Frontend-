@@ -8,7 +8,9 @@ import { useModal } from "@/hooks/useModal";
 import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
-import { employeeApi, Employee } from "@/lib/api/employees";
+import SelectInput from "@/components/form/SelectInput";
+import { employeeApi, Employee, CreateEmployeeDTO } from "@/lib/api/employees";
+import { rolesApi, Role } from "@/lib/api/roles";
 
 // Format date helper
 const formatDate = (dateString: string): string => {
@@ -33,6 +35,7 @@ const formatCurrency = (amount: string): string => {
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -41,23 +44,27 @@ export default function EmployeesPage() {
   const addModal = useModal();
   const editModal = useModal();
 
-  // Fetch employees from API
+  // Fetch employees and roles from API
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await employeeApi.getAll();
-        setEmployees(data);
+        const [employeesData, rolesData] = await Promise.all([
+          employeeApi.getAll(),
+          rolesApi.getAll(),
+        ]);
+        setEmployees(employeesData);
+        setRoles(rolesData);
       } catch (err: any) {
-        console.error("Failed to fetch employees:", err);
-        setError(err?.message || "Failed to load employees");
+        console.error("Failed to fetch data:", err);
+        setError(err?.message || "Failed to load data");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchEmployees();
+    fetchData();
   }, []);
 
   // Handle toggle active status
@@ -106,18 +113,37 @@ export default function EmployeesPage() {
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const payload = Object.fromEntries(formData.entries());
 
     const saveEmployee = async () => {
       try {
         setIsSaving(true);
         setError(null);
 
+        // Format the payload according to API requirements
+        const payload: CreateEmployeeDTO = {
+          first_name: formData.get("first_name") as string,
+          last_name: formData.get("last_name") as string,
+          email: formData.get("email") as string,
+          password: formData.get("password") as string,
+          phone: formData.get("phone") as string,
+          date_of_birth: formData.get("date_of_birth") as string,
+          gender: formData.get("gender") as "male" | "female",
+          address: formData.get("address") as string,
+          hire_date: formData.get("hire_date") as string,
+          salary: parseFloat(formData.get("salary") as string),
+          role_id: parseInt(formData.get("role_id") as string),
+        };
+
         if (isEditMode && selectedEmployee) {
-          // Update existing employee
+          // Update existing employee (password is optional for updates)
+          const updatePayload: any = { ...payload };
+          // Don't send password if it's empty in edit mode
+          if (!updatePayload.password) {
+            delete updatePayload.password;
+          }
           const updated = await employeeApi.update(
             selectedEmployee.employee_code,
-            payload as any
+            updatePayload
           );
           setEmployees((prev) =>
             prev.map((emp) =>
@@ -127,8 +153,30 @@ export default function EmployeesPage() {
           editModal.closeModal();
         } else {
           // Create new employee
-          const created = await employeeApi.create(payload as any);
-          setEmployees((prev) => [created, ...prev]);
+          const created = await employeeApi.create(payload);
+          
+          console.log("Created employee response:", created);
+          
+          // Enrich with role_name if not provided by backend
+          const enrichedEmployee = {
+            ...created,
+            role_name: created.role_name || roles.find(r => r.id === created.role_id)?.name || "Unknown",
+          };
+          
+          console.log("Enriched employee:", enrichedEmployee);
+          
+          // Refetch employees to ensure we have complete data from server
+          // This ensures the new employee appears in the table with all fields
+          try {
+            const refreshedEmployees = await employeeApi.getAll();
+            console.log("Refreshed employees:", refreshedEmployees);
+            setEmployees(refreshedEmployees);
+          } catch (refreshError) {
+            console.warn("Failed to refresh employees list:", refreshError);
+            // Fallback: Add the enriched employee optimistically
+            setEmployees((prev) => [enrichedEmployee, ...prev]);
+          }
+          
           addModal.closeModal();
           form.reset();
         }
@@ -230,21 +278,25 @@ export default function EmployeesPage() {
     sortable: true,
     width: "120px",
     minWidth: "120px",
-    render: (value) => (
+    render: (value) => {
+      if (!value) return <span className="text-gray-400">-</span>;
+      const roleValue = String(value).toLowerCase();
+      return (
       <span 
         className="capitalize px-3 py-1.5 rounded-lg text-xs font-medium inline-block whitespace-nowrap"
         style={{
-          backgroundColor: value.toLowerCase() === "admin" 
+            backgroundColor: roleValue === "admin" 
             ? "rgba(70, 95, 255, 0.15)" 
             : "rgba(11, 165, 236, 0.15)",
-          color: value.toLowerCase() === "admin" 
+            color: roleValue === "admin" 
             ? "#465fff" 
             : "#0ba5ec",
         }}
       >
         {value}
       </span>
-    ),
+      );
+    },
   },
   {
     key: "is_active",
@@ -379,6 +431,10 @@ export default function EmployeesPage() {
                 <Input type="email" name="email" placeholder="Enter email address" required />
               </div>
               <div>
+                <Label>Password</Label>
+                <Input type="password" name="password" placeholder="Enter password" required />
+              </div>
+              <div>
                 <Label>Phone</Label>
                 <Input type="text" name="phone" placeholder="Enter phone number" required />
               </div>
@@ -388,19 +444,39 @@ export default function EmployeesPage() {
               </div>
               <div>
                 <Label>Gender</Label>
-                <Input type="text" name="gender" placeholder="Enter gender" required />
+                <SelectInput
+                  name="gender"
+                  options={[
+                    { value: "male", label: "Male" },
+                    { value: "female", label: "Female" },
+                  ]}
+                  placeholder="Select gender"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <SelectInput
+                  name="role_id"
+                  options={roles.map((role) => ({
+                    value: role.id,
+                    label: role.name.charAt(0).toUpperCase() + role.name.slice(1),
+                  }))}
+                  placeholder="Select role"
+                  required
+                />
               </div>
               <div className="sm:col-span-2">
                 <Label>Address</Label>
-                <Input type="text" name="address" placeholder="Enter address" required />
+                <Input type="text" name="address" placeholder="Enter address" />
               </div>
               <div>
                 <Label>Hire Date</Label>
-                <Input type="date" name="hire_date" required />
+                <Input type="date" name="hire_date" />
               </div>
               <div>
                 <Label>Salary</Label>
-                <Input type="number" name="salary" placeholder="Enter salary" step="0.01" required />
+                <Input type="number" name="salary" placeholder="Enter salary" step={0.01} required />
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-4">
@@ -438,7 +514,7 @@ export default function EmployeesPage() {
                   type="text" 
                   name="first_name" 
                   defaultValue={selectedEmployee?.first_name || ""} 
-                  required 
+                 
                 />
               </div>
               <div>
@@ -447,7 +523,7 @@ export default function EmployeesPage() {
                   type="text" 
                   name="last_name" 
                   defaultValue={selectedEmployee?.last_name || ""} 
-                  required 
+                 
                 />
               </div>
               <div>
@@ -456,7 +532,15 @@ export default function EmployeesPage() {
                   type="email" 
                   name="email" 
                   defaultValue={selectedEmployee?.email || ""} 
-                  required 
+                 
+                />
+              </div>
+              <div>
+                <Label>Password (leave blank to keep current)</Label>
+                <Input 
+                  type="password" 
+                  name="password" 
+                  placeholder="Enter new password (optional)" 
                 />
               </div>
               <div>
@@ -479,11 +563,28 @@ export default function EmployeesPage() {
               </div>
               <div>
                 <Label>Gender</Label>
-                <Input 
-                  type="text" 
-                  name="gender" 
-                  defaultValue={selectedEmployee?.gender || ""} 
-                  required 
+                <SelectInput
+                  name="gender"
+                  options={[
+                    { value: "male", label: "Male" },
+                    { value: "female", label: "Female" },
+                  ]}
+                  placeholder="Select gender"
+                  defaultValue={selectedEmployee?.gender || ""}
+                  required
+                />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <SelectInput
+                  name="role_id"
+                  options={roles.map((role) => ({
+                    value: role.id,
+                    label: role.name.charAt(0).toUpperCase() + role.name.slice(1),
+                  }))}
+                  placeholder="Select role"
+                  defaultValue={selectedEmployee?.role_id !== undefined ? selectedEmployee.role_id : ""}
+                  required
                 />
               </div>
               <div className="sm:col-span-2">
@@ -509,8 +610,8 @@ export default function EmployeesPage() {
                 <Input 
                   type="number" 
                   name="salary" 
-                  defaultValue={selectedEmployee?.salary || ""} 
-                  step="0.01" 
+                  defaultValue={selectedEmployee?.salary ? (selectedEmployee.salary as string | number) : ""} 
+                  step={0.01} 
                   required 
                 />
               </div>

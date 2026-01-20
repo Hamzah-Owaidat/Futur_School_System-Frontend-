@@ -31,13 +31,14 @@ export interface CreateEmployeeDTO {
   first_name: string;
   last_name: string;
   email: string;
+  password: string;
   phone: string;
   date_of_birth: string;
-  gender: string;
+  gender: "male" | "female";
   address: string;
   hire_date: string;
-  salary: string;
-  role_id?: number;
+  salary: number;
+  role_id: number;
 }
 
 // Update Employee DTO
@@ -73,7 +74,22 @@ export const employeeApi = {
   create: async (data: CreateEmployeeDTO): Promise<Employee> => {
     const response = await api.post<Employee>("/employees", data);
     const payload: any = response.data;
-    return (payload?.data ?? payload) as Employee;
+    
+    // Handle different response structures:
+    // { data: { employee: {...} } }
+    // { data: {...} }
+    // { employee: {...} }
+    // {...}
+    if (payload?.data?.employee) {
+      return payload.data.employee as Employee;
+    }
+    if (payload?.data) {
+      return payload.data as Employee;
+    }
+    if (payload?.employee) {
+      return payload.employee as Employee;
+    }
+    return payload as Employee;
   },
 
   // Update employee

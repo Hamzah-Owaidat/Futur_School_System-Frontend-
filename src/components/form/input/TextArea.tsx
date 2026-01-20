@@ -1,23 +1,29 @@
 import React from "react";
 
 interface TextareaProps {
+  name?: string;
   placeholder?: string; // Placeholder text
   rows?: number; // Number of rows
-  value?: string; // Current value
+  value?: string; // Current value (controlled)
+  defaultValue?: string; // Default value (uncontrolled)
   onChange?: (value: string) => void; // Change handler
   className?: string; // Additional CSS classes
   disabled?: boolean; // Disabled state
+  required?: boolean; // Required field
   error?: boolean; // Error state
   hint?: string; // Hint text to display
 }
 
 const TextArea: React.FC<TextareaProps> = ({
+  name,
   placeholder = "Enter your message", // Default placeholder
   rows = 3, // Default number of rows
-  value = "", // Default value
+  value, // optional controlled value
+  defaultValue, // optional default value
   onChange, // Callback for changes
   className = "", // Additional custom styles
   disabled = false, // Disabled state
+  required = false, // Required field
   error = false, // Error state
   hint = "", // Default hint text
 }) => {
@@ -40,11 +46,14 @@ const TextArea: React.FC<TextareaProps> = ({
   return (
     <div className="relative">
       <textarea
+        name={name}
         placeholder={placeholder}
         rows={rows}
         value={value}
+        defaultValue={defaultValue}
         onChange={handleChange}
         disabled={disabled}
+        required={required}
         className={textareaClasses}
       />
       {hint && (
