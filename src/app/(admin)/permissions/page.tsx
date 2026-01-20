@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import ReusableTable, { Column, ActionHandlers } from "@/components/tables/ReusableTable";
+import { ReusableTable, Column, ActionHandlers } from "@/components/tables/ReusableTable";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
 import Button from "@/components/ui/button/Button";

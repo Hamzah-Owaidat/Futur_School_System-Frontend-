@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import ReusableTable, { Column, ActionHandlers } from "@/components/tables/ReusableTable";
+import { ReusableTable, Column, ActionHandlers } from "@/components/tables/ReusableTable";
 import { ToggleSwitch } from "@/components/ui/toggle/ToggleSwitch";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
