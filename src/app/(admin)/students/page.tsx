@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ReusableTable, Column, ActionHandlers } from "@/components/tables/ReusableTable";
 import { ToggleSwitch } from "@/components/ui/toggle/ToggleSwitch";
 import { Modal } from "@/components/ui/modal";
@@ -8,108 +8,9 @@ import { useModal } from "@/hooks/useModal";
 import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
-
-// Student interface based on the provided data structure
-interface Student {
-  id: number;
-  student_code: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  date_of_birth: string;
-  gender: string;
-  address: string;
-  parent_name: string;
-  parent_phone: string;
-  parent_email: string;
-  enrollment_date: string;
-  class_id: number;
-  is_active: number;
-  created_by: number;
-  updated_by: number;
-  created_at: string;
-  updated_at: string;
-  class_name: string;
-  class_code: string;
-  grade_level: number;
-}
-
-// Mock data - Replace this with actual API call
-const mockStudents: Student[] = [
-  {
-    id: 1,
-    student_code: "STU001",
-    first_name: "Alice",
-    last_name: "Williams",
-    email: "alice.williams@student.futurschool.com",
-    phone: "111-222-3333",
-    date_of_birth: "2015-05-14T21:00:00.000Z",
-    gender: "female",
-    address: "456 Student St",
-    parent_name: "John Williams",
-    parent_phone: "111-222-3334",
-    parent_email: "john.williams@email.com",
-    enrollment_date: "2024-08-31T21:00:00.000Z",
-    class_id: 1,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T13:56:00.000Z",
-    updated_at: "2025-12-03T13:56:00.000Z",
-    class_name: "gradee 1-A",
-    class_code: "G1A",
-    grade_level: 1,
-  },
-  {
-    id: 2,
-    student_code: "STU002",
-    first_name: "Bob",
-    last_name: "Johnson",
-    email: "bob.johnson@student.futurschool.com",
-    phone: "222-333-4444",
-    date_of_birth: "2014-08-20T21:00:00.000Z",
-    gender: "male",
-    address: "789 Student Ave",
-    parent_name: "Mary Johnson",
-    parent_phone: "222-333-4445",
-    parent_email: "mary.johnson@email.com",
-    enrollment_date: "2024-08-31T21:00:00.000Z",
-    class_id: 1,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T13:56:00.000Z",
-    updated_at: "2025-12-03T13:56:00.000Z",
-    class_name: "gradee 1-A",
-    class_code: "G1A",
-    grade_level: 1,
-  },
-  {
-    id: 6,
-    student_code: "STU006",
-    first_name: "Jane",
-    last_name: "Smith",
-    email: "jane.smith@student.futurschool.com",
-    phone: "111-222-3333",
-    date_of_birth: "2015-05-14T21:00:00.000Z",
-    gender: "female",
-    address: "456 Student St",
-    parent_name: "John Smith",
-    parent_phone: "111-222-3334",
-    parent_email: "john.smith@email.com",
-    enrollment_date: "2024-08-31T21:00:00.000Z",
-    class_id: 1,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T13:56:00.000Z",
-    updated_at: "2025-12-03T13:56:00.000Z",
-    class_name: "gradee 1-A",
-    class_code: "G1A",
-    grade_level: 1,
-  },
-];
+import SelectInput from "@/components/form/SelectInput";
+import { studentsApi, Student, CreateStudentDTO, UpdateStudentDTO } from "@/lib/api/students";
+import { classesApi, Class } from "@/lib/api/classes";
 
 // Format date helper
 const formatDate = (dateString: string): string => {
@@ -123,15 +24,49 @@ const formatDate = (dateString: string): string => {
 };
 
 export default function StudentsPage() {
-  // TODO: Replace with actual data fetching
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [viewStudent, setViewStudent] = useState<Student | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const addModal = useModal();
   const editModal = useModal();
+  const viewModal = useModal();
+
+  // Fetch students and classes from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const [studentsData, classesData] = await Promise.all([
+          studentsApi.getAll(),
+          classesApi.getAll(),
+        ]);
+        setStudents(studentsData);
+        setClasses(classesData);
+      } catch (err: any) {
+        console.error("Failed to fetch data:", err);
+        setError(err?.message || "Failed to load data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const refetchStudents = async () => {
+    const data = await studentsApi.getAll();
+    setStudents(data);
+  };
 
   // Handle toggle active status
   const handleToggleActive = (studentId: number, newStatus: boolean) => {
+    // Optimistic UI update
     setStudents((prev) =>
       prev.map((student) =>
         student.id === studentId
@@ -139,8 +74,21 @@ export default function StudentsPage() {
           : student
       )
     );
-    // TODO: Call API to update student status
-    // updateStudentStatus(studentId, newStatus ? 1 : 0);
+
+    // Persist change to API
+    studentsApi
+      .updateStatus(studentId, newStatus)
+      .catch((err) => {
+        console.error("Failed to update student status:", err);
+        setStudents((prev) =>
+          prev.map((student) =>
+            student.id === studentId
+              ? { ...student, is_active: newStatus ? 0 : 1 }
+              : student
+          )
+        );
+        alert(err?.message || "Failed to update student status");
+      });
   };
 
   // Handle add student
@@ -151,26 +99,99 @@ export default function StudentsPage() {
   };
 
   // Handle edit student
-  const handleEditStudent = (student: Student) => {
-    setSelectedStudent(student);
-    setIsEditMode(true);
-    editModal.openModal();
+  const handleEditStudent = async (student: Student) => {
+    try {
+      setIsEditMode(true);
+      // Fetch full student details to ensure we have all fields
+      const details = await studentsApi.getById(student.id);
+      setSelectedStudent(details);
+      editModal.openModal();
+    } catch (err: any) {
+      console.error("Failed to load student details:", err);
+      alert(err?.message || "Failed to load student details");
+    }
+  };
+
+  // Handle view student
+  const handleViewStudent = async (student: Student) => {
+    try {
+      // Fetch full student details
+      const details = await studentsApi.getById(student.id);
+      setViewStudent(details);
+      viewModal.openModal();
+    } catch (err: any) {
+      console.error("Failed to load student details:", err);
+      alert(err?.message || "Failed to load student details");
+    }
   };
 
   // Handle save student (both add and edit)
   const handleSaveStudent = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    // TODO: Call API to save student
-    console.log("Saving student:", Object.fromEntries(formData));
-    
-    // Close modal
-    if (isEditMode) {
-      editModal.closeModal();
-    } else {
-      addModal.closeModal();
-    }
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const saveStudent = async () => {
+      try {
+        setIsSaving(true);
+        setError(null);
+
+        // Format the payload according to API requirements
+        const basePayload: CreateStudentDTO = {
+          student_code: (formData.get("student_code") as string) || "",
+          first_name: (formData.get("first_name") as string) || "",
+          last_name: (formData.get("last_name") as string) || "",
+          email: (formData.get("email") as string) || null,
+          phone: (formData.get("phone") as string) || null,
+          date_of_birth: (formData.get("date_of_birth") as string) || "",
+          gender: (formData.get("gender") as string) || "other",
+          address: (formData.get("address") as string) || null,
+          parent_name: (formData.get("parent_name") as string) || null,
+          parent_phone: (formData.get("parent_phone") as string) || null,
+          parent_email: (formData.get("parent_email") as string) || null,
+          enrollment_date: (formData.get("enrollment_date") as string) || "",
+          class_id: formData.get("class_id")
+            ? parseInt(formData.get("class_id") as string, 10)
+            : null,
+        };
+
+        if (isEditMode && selectedStudent) {
+          // Update existing student
+          const updatePayload: UpdateStudentDTO = { ...basePayload };
+          const updated = await studentsApi.update(selectedStudent.id, updatePayload);
+
+          // Refetch students to ensure we have complete data
+          try {
+            const refreshedStudents = await studentsApi.getAll();
+            setStudents(refreshedStudents);
+          } catch (refreshError) {
+            console.warn("Failed to refresh students list:", refreshError);
+            // Fallback: Update optimistically
+            setStudents((prev) =>
+              prev.map((stu) => (stu.id === updated.id ? updated : stu))
+            );
+          }
+
+          editModal.closeModal();
+          setSelectedStudent(null);
+          setIsEditMode(false);
+        } else {
+          // Create new student
+          await studentsApi.create(basePayload);
+          await refetchStudents();
+          addModal.closeModal();
+          form.reset();
+        }
+      } catch (err: any) {
+        console.error("Failed to save student:", err);
+        setError(err?.message || "Failed to save student");
+        alert(err?.message || "Failed to save student");
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    void saveStudent();
   };
 
   // Column definitions
@@ -305,27 +326,37 @@ export default function StudentsPage() {
     },
   ];
 
+  // Handle delete student
+  const handleDeleteStudent = (student: Student) => {
+    if (
+      confirm(
+        `Are you sure you want to delete ${student.first_name} ${student.last_name}? This will deactivate the student.`
+      )
+    ) {
+      const deleteStudent = async () => {
+        try {
+          await studentsApi.delete(student.id);
+          setStudents((prev) => prev.filter((stu) => stu.id !== student.id));
+        } catch (err: any) {
+          console.error("Failed to delete student:", err);
+          alert(err?.message || "Failed to delete student");
+        }
+      };
+
+      void deleteStudent();
+    }
+  };
+
   // Action handlers
   const actions: ActionHandlers<Student> = {
     onView: (student) => {
-      console.log("View student:", student);
-      // TODO: Navigate to student detail page or open view modal
-      alert(`Viewing: ${student.first_name} ${student.last_name}`);
+      handleViewStudent(student);
     },
     onEdit: (student) => {
       handleEditStudent(student);
     },
     onDelete: (student) => {
-      console.log("Delete student:", student);
-      // TODO: Show confirmation dialog and delete
-      if (
-        confirm(
-          `Are you sure you want to delete ${student.first_name} ${student.last_name}?`
-        )
-      ) {
-        // TODO: Perform delete operation
-        alert(`Deleted: ${student.student_code}`);
-      }
+      handleDeleteStudent(student);
     },
     onCopyId: (student) => {
       // Copy student code to clipboard
@@ -367,6 +398,11 @@ export default function StudentsPage() {
       </div>
 
       {/* Students Table */}
+      {error && (
+        <p className="text-sm" style={{ color: "var(--theme-text-error, #f04438)" }}>
+          {error}
+        </p>
+      )}
       <ReusableTable
         data={students}
         columns={columns}
@@ -391,6 +427,21 @@ export default function StudentsPage() {
           <form onSubmit={handleSaveStudent} className="space-y-5">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
+                <Label htmlFor="student_code">Student Code</Label>
+                <Input type="text" name="student_code" placeholder="e.g. STU001" required />
+              </div>
+              <div>
+                <Label htmlFor="class_id">Class</Label>
+                <SelectInput
+                  name="class_id"
+                  options={classes.map((cls) => ({
+                    value: cls.id,
+                    label: `${cls.class_name} (${cls.class_code})`,
+                  }))}
+                  placeholder="Select class (optional)"
+                />
+              </div>
+              <div>
                 <Label>First Name</Label>
                 <Input type="text" name="first_name" placeholder="Enter first name" required />
               </div>
@@ -400,35 +451,44 @@ export default function StudentsPage() {
               </div>
               <div>
                 <Label>Email</Label>
-                <Input type="email" name="email" placeholder="Enter email address" required />
+                <Input type="email" name="email" placeholder="Enter email address" />
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input type="text" name="phone" placeholder="Enter phone number" required />
+                <Input type="text" name="phone" placeholder="Enter phone number" />
               </div>
               <div>
                 <Label>Date of Birth</Label>
                 <Input type="date" name="date_of_birth" required />
               </div>
               <div>
-                <Label>Gender</Label>
-                <Input type="text" name="gender" placeholder="Enter gender" required />
+                <Label htmlFor="gender">Gender</Label>
+                <SelectInput
+                  name="gender"
+                  options={[
+                    { value: "male", label: "Male" },
+                    { value: "female", label: "Female" },
+                    { value: "other", label: "Other" },
+                  ]}
+                  placeholder="Select gender"
+                  defaultValue="other"
+                />
               </div>
               <div className="sm:col-span-2">
                 <Label>Address</Label>
-                <Input type="text" name="address" placeholder="Enter address" required />
+                <Input type="text" name="address" placeholder="Enter address" />
               </div>
               <div>
                 <Label>Parent Name</Label>
-                <Input type="text" name="parent_name" placeholder="Enter parent name" required />
+                <Input type="text" name="parent_name" placeholder="Enter parent name" />
               </div>
               <div>
                 <Label>Parent Phone</Label>
-                <Input type="text" name="parent_phone" placeholder="Enter parent phone" required />
+                <Input type="text" name="parent_phone" placeholder="Enter parent phone" />
               </div>
               <div>
                 <Label>Parent Email</Label>
-                <Input type="email" name="parent_email" placeholder="Enter parent email" required />
+                <Input type="email" name="parent_email" placeholder="Enter parent email" />
               </div>
               <div>
                 <Label>Enrollment Date</Label>
@@ -439,8 +499,8 @@ export default function StudentsPage() {
               <Button type="button" variant="outline" onClick={addModal.closeModal}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
-                Add Student
+              <Button type="submit" variant="primary" disabled={isSaving}>
+                {isSaving ? "Adding..." : "Add Student"}
               </Button>
             </div>
           </form>
@@ -465,6 +525,31 @@ export default function StudentsPage() {
           <form onSubmit={handleSaveStudent} className="space-y-5">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
+                <Label htmlFor="student_code">Student Code</Label>
+                <Input 
+                  type="text" 
+                  name="student_code" 
+                  defaultValue={selectedStudent?.student_code || ""} 
+                  required 
+                />
+              </div>
+              <div>
+                <Label htmlFor="class_id">Class</Label>
+                <SelectInput
+                  name="class_id"
+                  options={classes.map((cls) => ({
+                    value: cls.id,
+                    label: `${cls.class_name} (${cls.class_code})`,
+                  }))}
+                  placeholder="Select class (optional)"
+                  defaultValue={
+                    selectedStudent?.class_id !== undefined && selectedStudent?.class_id !== null
+                      ? selectedStudent.class_id
+                      : ""
+                  }
+                />
+              </div>
+              <div>
                 <Label>First Name</Label>
                 <Input 
                   type="text" 
@@ -488,7 +573,6 @@ export default function StudentsPage() {
                   type="email" 
                   name="email" 
                   defaultValue={selectedStudent?.email || ""} 
-                  required 
                 />
               </div>
               <div>
@@ -497,7 +581,6 @@ export default function StudentsPage() {
                   type="text" 
                   name="phone" 
                   defaultValue={selectedStudent?.phone || ""} 
-                  required 
                 />
               </div>
               <div>
@@ -510,12 +593,16 @@ export default function StudentsPage() {
                 />
               </div>
               <div>
-                <Label>Gender</Label>
-                <Input 
-                  type="text" 
-                  name="gender" 
-                  defaultValue={selectedStudent?.gender || ""} 
-                  required 
+                <Label htmlFor="gender">Gender</Label>
+                <SelectInput
+                  name="gender"
+                  options={[
+                    { value: "male", label: "Male" },
+                    { value: "female", label: "Female" },
+                    { value: "other", label: "Other" },
+                  ]}
+                  placeholder="Select gender"
+                  defaultValue={selectedStudent?.gender || "other"}
                 />
               </div>
               <div className="sm:col-span-2">
@@ -524,7 +611,6 @@ export default function StudentsPage() {
                   type="text" 
                   name="address" 
                   defaultValue={selectedStudent?.address || ""} 
-                  required 
                 />
               </div>
               <div>
@@ -533,7 +619,6 @@ export default function StudentsPage() {
                   type="text" 
                   name="parent_name" 
                   defaultValue={selectedStudent?.parent_name || ""} 
-                  required 
                 />
               </div>
               <div>
@@ -542,7 +627,6 @@ export default function StudentsPage() {
                   type="text" 
                   name="parent_phone" 
                   defaultValue={selectedStudent?.parent_phone || ""} 
-                  required 
                 />
               </div>
               <div>
@@ -551,7 +635,6 @@ export default function StudentsPage() {
                   type="email" 
                   name="parent_email" 
                   defaultValue={selectedStudent?.parent_email || ""} 
-                  required 
                 />
               </div>
               <div>
@@ -568,11 +651,153 @@ export default function StudentsPage() {
               <Button type="button" variant="outline" onClick={editModal.closeModal}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
-                Update Student
+              <Button type="submit" variant="primary" disabled={isSaving}>
+                {isSaving ? "Updating..." : "Update Student"}
               </Button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      {/* View Student Modal */}
+      <Modal
+        isOpen={viewModal.isOpen}
+        onClose={viewModal.closeModal}
+        className="max-w-[800px] m-4 p-6 lg:p-8"
+      >
+        <div className="overflow-y-auto custom-scrollbar max-h-[calc(100vh-200px)] pr-4">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold mb-1" style={{ color: "var(--theme-text-primary)" }}>
+              {viewStudent?.first_name} {viewStudent?.last_name}
+            </h2>
+            <p className="text-sm" style={{ color: "var(--theme-text-secondary)" }}>
+              Student Code: {viewStudent?.student_code}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Email</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewStudent?.email || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Phone</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewStudent?.phone || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Date of Birth</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewStudent?.date_of_birth ? formatDate(viewStudent.date_of_birth) : "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Gender</div>
+              <div className="font-medium capitalize" style={{ color: "var(--theme-text-primary)" }}>
+                {viewStudent?.gender || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Enrollment Date</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewStudent?.enrollment_date ? formatDate(viewStudent.enrollment_date) : "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Class</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewStudent?.class_name ? `${viewStudent.class_name} (${viewStudent.class_code})` : "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Grade Level</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewStudent?.grade_level || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Status</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    viewStudent?.is_active === 1
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  }`}
+                >
+                  {viewStudent?.is_active === 1 ? "Active" : "Inactive"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {viewStudent?.address && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--theme-text-primary)" }}>
+                Address
+              </h3>
+              <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+                <p className="text-sm" style={{ color: "var(--theme-text-primary)" }}>
+                  {viewStudent.address}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {(viewStudent?.parent_name || viewStudent?.parent_phone || viewStudent?.parent_email) && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--theme-text-primary)" }}>
+                Parent Information
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {viewStudent?.parent_name && (
+                  <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+                    <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Parent Name</div>
+                    <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                      {viewStudent.parent_name}
+                    </div>
+                  </div>
+                )}
+                {viewStudent?.parent_phone && (
+                  <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+                    <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Parent Phone</div>
+                    <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                      {viewStudent.parent_phone}
+                    </div>
+                  </div>
+                )}
+                {viewStudent?.parent_email && (
+                  <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+                    <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Parent Email</div>
+                    <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                      {viewStudent.parent_email}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={viewModal.closeModal}>
+              Close
+            </Button>
+            {viewStudent && (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  viewModal.closeModal();
+                  handleEditStudent(viewStudent);
+                }}
+              >
+                Edit Student
+              </Button>
+            )}
+          </div>
         </div>
       </Modal>
     </div>

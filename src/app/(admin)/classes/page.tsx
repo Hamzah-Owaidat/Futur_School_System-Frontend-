@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ReusableTable, Column, ActionHandlers } from "@/components/tables/ReusableTable";
 import { ToggleSwitch } from "@/components/ui/toggle/ToggleSwitch";
 import { Modal } from "@/components/ui/modal";
@@ -8,92 +8,7 @@ import { useModal } from "@/hooks/useModal";
 import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
-
-// Class interface based on the provided data structure
-interface Class {
-  id: number;
-  class_name: string;
-  class_code: string;
-  grade_level: number;
-  section: string;
-  capacity: number;
-  room_number: string;
-  academic_year: string;
-  teacher_id: number;
-  is_active: number;
-  created_by: number;
-  updated_by: number;
-  created_at: string;
-  updated_at: string;
-  teacher_first_name: string;
-  teacher_last_name: string;
-  teacher_code: string;
-  student_count: number;
-}
-
-// Mock data - Replace this with actual API call
-const mockClasses: Class[] = [
-  {
-    id: 1,
-    class_name: "gradee 1-A",
-    class_code: "G1A",
-    grade_level: 1,
-    section: "A",
-    capacity: 30,
-    room_number: "101",
-    academic_year: "2024-2025",
-    teacher_id: 2,
-    is_active: 0,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T12:03:36.000Z",
-    updated_at: "2025-12-03T13:40:06.000Z",
-    teacher_first_name: "Sarah",
-    teacher_last_name: "Johnson",
-    teacher_code: "EMP002",
-    student_count: 2,
-  },
-  {
-    id: 2,
-    class_name: "gradee 2-B",
-    class_code: "G2B",
-    grade_level: 2,
-    section: "B",
-    capacity: 25,
-    room_number: "102",
-    academic_year: "2024-2025",
-    teacher_id: 1,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T12:03:36.000Z",
-    updated_at: "2025-12-03T13:40:06.000Z",
-    teacher_first_name: "John",
-    teacher_last_name: "Doe",
-    teacher_code: "EMP001",
-    student_count: 15,
-  },
-  {
-    id: 3,
-    class_name: "gradee 3-C",
-    class_code: "G3C",
-    grade_level: 3,
-    section: "C",
-    capacity: 28,
-    room_number: "103",
-    academic_year: "2024-2025",
-    teacher_id: 2,
-    is_active: 1,
-    created_by: 1,
-    updated_by: 1,
-    created_at: "2025-12-03T12:03:36.000Z",
-    updated_at: "2025-12-03T13:40:06.000Z",
-    teacher_first_name: "Sarah",
-    teacher_last_name: "Johnson",
-    teacher_code: "EMP002",
-    student_count: 20,
-  },
-];
+import { classesApi, Class, CreateClassDTO, UpdateClassDTO } from "@/lib/api/classes";
 
 // Format date helper
 const formatDate = (dateString: string): string => {
@@ -107,24 +22,60 @@ const formatDate = (dateString: string): string => {
 };
 
 export default function ClassesPage() {
-  // TODO: Replace with actual data fetching
-  const [classes, setClasses] = useState<Class[]>(mockClasses);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+  const [viewClass, setViewClass] = useState<Class | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const addModal = useModal();
   const editModal = useModal();
+  const viewModal = useModal();
+
+  // Fetch classes from API
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await classesApi.getAll();
+        setClasses(data);
+      } catch (err: any) {
+        console.error("Failed to fetch classes:", err);
+        setError(err?.message || "Failed to load classes");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchClasses();
+  }, []);
+
+  const refetchClasses = async () => {
+    const data = await classesApi.getAll();
+    setClasses(data);
+  };
 
   // Handle toggle active status
   const handleToggleActive = (classId: number, newStatus: boolean) => {
     setClasses((prev) =>
       prev.map((cls) =>
-        cls.id === classId
-          ? { ...cls, is_active: newStatus ? 1 : 0 }
-          : cls
+        cls.id === classId ? { ...cls, is_active: newStatus ? 1 : 0 } : cls
       )
     );
-    // TODO: Call API to update class status
-    // updateClassStatus(classId, newStatus ? 1 : 0);
+
+    classesApi
+      .updateStatus(classId, newStatus)
+      .catch((err: any) => {
+        console.error("Failed to update class status:", err);
+        setClasses((prev) =>
+          prev.map((cls) =>
+            cls.id === classId ? { ...cls, is_active: newStatus ? 0 : 1 } : cls
+          )
+        );
+        alert(err?.message || "Failed to update class status");
+      });
   };
 
   // Handle add class
@@ -135,26 +86,82 @@ export default function ClassesPage() {
   };
 
   // Handle edit class
-  const handleEditClass = (classItem: Class) => {
-    setSelectedClass(classItem);
-    setIsEditMode(true);
-    editModal.openModal();
+  const handleEditClass = async (classItem: Class) => {
+    try {
+      setIsEditMode(true);
+      const details = await classesApi.getById(classItem.id);
+      setSelectedClass(details);
+      editModal.openModal();
+    } catch (err: any) {
+      console.error("Failed to load class details:", err);
+      alert(err?.message || "Failed to load class details");
+    }
+  };
+
+  // Handle view class
+  const handleViewClass = async (classItem: Class) => {
+    try {
+      const details = await classesApi.getById(classItem.id);
+      setViewClass(details);
+      viewModal.openModal();
+    } catch (err: any) {
+      console.error("Failed to load class details:", err);
+      alert(err?.message || "Failed to load class details");
+    }
   };
 
   // Handle save class (both add and edit)
   const handleSaveClass = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    // TODO: Call API to save class
-    console.log("Saving class:", Object.fromEntries(formData));
-    
-    // Close modal
-    if (isEditMode) {
-      editModal.closeModal();
-    } else {
-      addModal.closeModal();
-    }
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const saveClass = async () => {
+      try {
+        setIsSaving(true);
+        setError(null);
+
+        const basePayload: CreateClassDTO = {
+          class_name: (formData.get("class_name") as string) || "",
+          class_code: (formData.get("class_code") as string) || "",
+          grade_level: parseInt((formData.get("grade_level") as string) || "0", 10),
+          section: ((formData.get("section") as string) || "").trim() || null,
+          capacity: formData.get("capacity")
+            ? parseInt(formData.get("capacity") as string, 10)
+            : undefined,
+          room_number: ((formData.get("room_number") as string) || "").trim() || null,
+          academic_year: (formData.get("academic_year") as string) || "",
+          // teacher_id is optional and not in the current form; can be added later
+        };
+
+        if (isEditMode && selectedClass) {
+          const updatePayload: UpdateClassDTO = {
+            ...basePayload,
+          };
+
+          await classesApi.update(selectedClass.id, updatePayload);
+          await refetchClasses();
+
+          editModal.closeModal();
+          setSelectedClass(null);
+          setIsEditMode(false);
+        } else {
+          await classesApi.create(basePayload);
+          await refetchClasses();
+
+          addModal.closeModal();
+          form.reset();
+        }
+      } catch (err: any) {
+        console.error("Failed to save class:", err);
+        setError(err?.message || "Failed to save class");
+        alert(err?.message || "Failed to save class");
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    void saveClass();
   };
 
   // Column definitions
@@ -262,23 +269,28 @@ export default function ClassesPage() {
   // Action handlers
   const actions: ActionHandlers<Class> = {
     onView: (classItem) => {
-      console.log("View class:", classItem);
-      // TODO: Navigate to class detail page or open view modal
-      alert(`Viewing: ${classItem.class_name}`);
+      handleViewClass(classItem);
     },
     onEdit: (classItem) => {
       handleEditClass(classItem);
     },
     onDelete: (classItem) => {
-      console.log("Delete class:", classItem);
-      // TODO: Show confirmation dialog and delete
       if (
         confirm(
-          `Are you sure you want to delete ${classItem.class_name}?`
+          `Are you sure you want to delete ${classItem.class_name}? This will deactivate the class.`
         )
       ) {
-        // TODO: Perform delete operation
-        alert(`Deleted: ${classItem.class_code}`);
+        const deleteClass = async () => {
+          try {
+            await classesApi.delete(classItem.id);
+            setClasses((prev) => prev.filter((cls) => cls.id !== classItem.id));
+          } catch (err: any) {
+            console.error("Failed to delete class:", err);
+            alert(err?.message || "Failed to delete class");
+          }
+        };
+
+        void deleteClass();
       }
     },
     onCopyId: (classItem) => {
@@ -320,12 +332,15 @@ export default function ClassesPage() {
         </Button>
       </div>
 
+      {/* Error message */}
+      {error && (
+        <p className="text-sm" style={{ color: "var(--theme-text-error, #f04438)" }}>
+          {error}
+        </p>
+      )}
+
       {/* Classes Table */}
-      <ReusableTable
-        data={classes}
-        columns={columns}
-        actions={actions}
-      />
+      <ReusableTable data={classes} columns={columns} actions={actions} />
 
       {/* Add Class Modal */}
       <Modal
@@ -377,7 +392,7 @@ export default function ClassesPage() {
               <Button type="button" variant="outline" onClick={addModal.closeModal}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" disabled={isSaving}>
                 Add Class
               </Button>
             </div>
@@ -472,11 +487,101 @@ export default function ClassesPage() {
               <Button type="button" variant="outline" onClick={editModal.closeModal}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" disabled={isSaving}>
                 Update Class
               </Button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      {/* View Class Modal */}
+      <Modal
+        isOpen={viewModal.isOpen}
+        onClose={viewModal.closeModal}
+        className="max-w-[800px] m-4 p-6 lg:p-8"
+      >
+        <div className="overflow-y-auto custom-scrollbar max-h-[calc(100vh-200px)] pr-4">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold mb-1" style={{ color: "var(--theme-text-primary)" }}>
+              {viewClass?.class_name} ({viewClass?.class_code})
+            </h2>
+            <p className="text-sm" style={{ color: "var(--theme-text-secondary)" }}>
+              Grade {viewClass?.grade_level} {viewClass?.section && `• Section ${viewClass.section}`}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Academic Year</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewClass?.academic_year || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Room</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewClass?.room_number || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Capacity</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewClass?.capacity ?? "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Students</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewClass?.student_count ?? 0} / {viewClass?.capacity ?? "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Teacher</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewClass?.teacher_first_name
+                  ? `${viewClass.teacher_first_name} ${viewClass.teacher_last_name ?? ""}`.trim()
+                  : "-"}
+              </div>
+              {viewClass?.teacher_code && (
+                <div className="text-xs mt-1" style={{ color: "var(--theme-text-secondary)" }}>
+                  Code: {viewClass.teacher_code}
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Status</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    viewClass?.is_active === 1
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  }`}
+                >
+                  {viewClass?.is_active === 1 ? "Active" : "Inactive"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={viewModal.closeModal}>
+              Close
+            </Button>
+            {viewClass && (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  viewModal.closeModal();
+                  handleEditClass(viewClass);
+                }}
+              >
+                Edit Class
+              </Button>
+            )}
+          </div>
         </div>
       </Modal>
     </div>
