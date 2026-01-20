@@ -37,12 +37,14 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [viewEmployee, setViewEmployee] = useState<Employee | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const addModal = useModal();
   const editModal = useModal();
+  const viewModal = useModal();
 
   // Fetch employees and roles from API
   useEffect(() => {
@@ -68,7 +70,7 @@ export default function EmployeesPage() {
   }, []);
 
   // Handle toggle active status
-  const handleToggleActive = (employeeCode: string, newStatus: boolean) => {
+  const handleToggleActive = (employeeCode: string, newStatus: boolean, employeeId: number) => {
     // Optimistic UI update
     setEmployees((prev) =>
       prev.map((emp) =>
@@ -80,7 +82,7 @@ export default function EmployeesPage() {
 
     // Persist change to API
     employeeApi
-      .updateStatus(employeeCode, newStatus)
+      .updateStatus(employeeId, newStatus)
       .catch((err) => {
         console.error("Failed to update employee status:", err);
         setEmployees((prev) =>
@@ -102,10 +104,30 @@ export default function EmployeesPage() {
   };
 
   // Handle edit employee
-  const handleEditEmployee = (employee: Employee) => {
-    setSelectedEmployee(employee);
-    setIsEditMode(true);
-    editModal.openModal();
+  const handleEditEmployee = async (employee: Employee) => {
+    try {
+      setIsEditMode(true);
+      // Fetch full employee details by numeric ID to ensure we have all fields
+      const details = await employeeApi.getById(employee.id);
+      setSelectedEmployee(details);
+      editModal.openModal();
+    } catch (err: any) {
+      console.error("Failed to load employee details:", err);
+      alert(err?.message || "Failed to load employee details");
+    }
+  };
+
+  // Handle view employee
+  const handleViewEmployee = async (employee: Employee) => {
+    try {
+      // Fetch full employee details by numeric ID
+      const details = await employeeApi.getById(employee.id);
+      setViewEmployee(details);
+      viewModal.openModal();
+    } catch (err: any) {
+      console.error("Failed to load employee details:", err);
+      alert(err?.message || "Failed to load employee details");
+    }
   };
 
   // Handle save employee (both add and edit)
@@ -138,19 +160,34 @@ export default function EmployeesPage() {
           // Update existing employee (password is optional for updates)
           const updatePayload: any = { ...payload };
           // Don't send password if it's empty in edit mode
-          if (!updatePayload.password) {
+          if (!updatePayload.password || updatePayload.password.trim() === "") {
             delete updatePayload.password;
           }
-          const updated = await employeeApi.update(
-            selectedEmployee.employee_code,
-            updatePayload
-          );
-          setEmployees((prev) =>
-            prev.map((emp) =>
-              emp.employee_code === updated.employee_code ? updated : emp
-            )
-          );
+          
+          console.log("Updating employee with id:", selectedEmployee.id);
+          console.log("Update payload:", updatePayload);
+          
+          const updated = await employeeApi.update(selectedEmployee.id, updatePayload);
+          
+          console.log("Updated employee response:", updated);
+          
+          // Refetch employees to ensure we have complete data
+          try {
+            const refreshedEmployees = await employeeApi.getAll();
+            setEmployees(refreshedEmployees);
+          } catch (refreshError) {
+            console.warn("Failed to refresh employees list:", refreshError);
+            // Fallback: Update optimistically
+            setEmployees((prev) =>
+              prev.map((emp) =>
+                emp.employee_code === updated.employee_code ? updated : emp
+              )
+            );
+          }
+          
           editModal.closeModal();
+          setSelectedEmployee(null);
+          setIsEditMode(false);
         } else {
           // Create new employee
           const created = await employeeApi.create(payload);
@@ -309,7 +346,7 @@ export default function EmployeesPage() {
         <ToggleSwitch
           checked={value === 1}
           onChange={(checked) => {
-            handleToggleActive(row.employee_code, checked);
+            handleToggleActive(row.employee_code, checked, row.id);
           }}
         />
       </div>
@@ -320,9 +357,7 @@ export default function EmployeesPage() {
   // Action handlers
   const actions: ActionHandlers<Employee> = {
     onView: (employee) => {
-      console.log("View employee:", employee);
-      // TODO: Navigate to employee detail page or open view modal
-      alert(`Viewing: ${employee.first_name} ${employee.last_name}`);
+      handleViewEmployee(employee);
     },
     onEdit: (employee) => {
       handleEditEmployee(employee);
@@ -335,7 +370,7 @@ export default function EmployeesPage() {
       ) {
         const deleteEmployee = async () => {
           try {
-            await employeeApi.delete(employee.employee_code);
+            await employeeApi.delete(employee.id);
             setEmployees((prev) =>
               prev.filter(
                 (emp) => emp.employee_code !== employee.employee_code
@@ -625,6 +660,114 @@ export default function EmployeesPage() {
               </Button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      {/* View Employee Modal */}
+      <Modal
+        isOpen={viewModal.isOpen}
+        onClose={viewModal.closeModal}
+        className="max-w-[800px] m-4 p-6 lg:p-8"
+      >
+        <div className="overflow-y-auto custom-scrollbar max-h-[calc(100vh-200px)] pr-4">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold mb-1" style={{ color: "var(--theme-text-primary)" }}>
+              {viewEmployee?.first_name} {viewEmployee?.last_name}
+            </h2>
+            <p className="text-sm" style={{ color: "var(--theme-text-secondary)" }}>
+              Employee Code: {viewEmployee?.employee_code}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Email</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewEmployee?.email || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Phone</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewEmployee?.phone || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Date of Birth</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewEmployee?.date_of_birth ? formatDate(viewEmployee.date_of_birth) : "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Gender</div>
+              <div className="font-medium capitalize" style={{ color: "var(--theme-text-primary)" }}>
+                {viewEmployee?.gender || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Hire Date</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewEmployee?.hire_date ? formatDate(viewEmployee.hire_date) : "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Salary</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                {viewEmployee?.salary ? formatCurrency(viewEmployee.salary) : "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Role</div>
+              <div className="font-medium capitalize" style={{ color: "var(--theme-text-primary)" }}>
+                {viewEmployee?.role_name || "-"}
+              </div>
+            </div>
+            <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+              <div className="text-xs mb-1" style={{ color: "var(--theme-text-tertiary)" }}>Status</div>
+              <div className="font-medium" style={{ color: "var(--theme-text-primary)" }}>
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    viewEmployee?.is_active === 1
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  }`}
+                >
+                  {viewEmployee?.is_active === 1 ? "Active" : "Inactive"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {viewEmployee?.address && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--theme-text-primary)" }}>
+                Address
+              </h3>
+              <div className="rounded-lg border p-4" style={{ borderColor: "var(--theme-border)" }}>
+                <p className="text-sm" style={{ color: "var(--theme-text-primary)" }}>
+                  {viewEmployee.address}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={viewModal.closeModal}>
+              Close
+            </Button>
+            {viewEmployee && (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  viewModal.closeModal();
+                  handleEditEmployee(viewEmployee);
+                }}
+              >
+                Edit Employee
+              </Button>
+            )}
+          </div>
         </div>
       </Modal>
     </div>

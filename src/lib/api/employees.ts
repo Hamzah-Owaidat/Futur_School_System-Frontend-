@@ -7,6 +7,7 @@ import { api } from "./axios";
 
 // Employee interface
 export interface Employee {
+  id: number;
   employee_code: string;
   first_name: string;
   last_name: string;
@@ -63,11 +64,22 @@ export const employeeApi = {
     return [];
   },
 
-  // Get employee by ID
-  getById: async (employeeId: string): Promise<Employee> => {
+  // Get employee by ID (numeric ID from backend)
+  getById: async (employeeId: number): Promise<Employee> => {
     const response = await api.get<Employee>(`/employees/${employeeId}`);
     const payload: any = response.data;
-    return (payload?.data ?? payload) as Employee;
+    
+    // Handle response structure: { success, message, data: { employee: {...} } }
+    if (payload?.data?.employee) {
+      return payload.data.employee as Employee;
+    }
+    if (payload?.data) {
+      return payload.data as Employee;
+    }
+    if (payload?.employee) {
+      return payload.employee as Employee;
+    }
+    return payload as Employee;
   },
 
   // Create new employee
@@ -93,19 +105,19 @@ export const employeeApi = {
   },
 
   // Update employee
-  update: async (employeeId: string, data: UpdateEmployeeDTO): Promise<Employee> => {
+  update: async (employeeId: number, data: UpdateEmployeeDTO): Promise<Employee> => {
     const response = await api.put<Employee>(`/employees/${employeeId}`, data);
     const payload: any = response.data;
     return (payload?.data ?? payload) as Employee;
   },
 
   // Delete employee
-  delete: async (employeeId: string): Promise<void> => {
+  delete: async (employeeId: number): Promise<void> => {
     await api.delete(`/employees/${employeeId}`);
   },
 
   // Update employee status
-  updateStatus: async (employeeId: string, isActive: boolean): Promise<Employee> => {
+  updateStatus: async (employeeId: number, isActive: boolean): Promise<Employee> => {
     const response = await api.patch<Employee>(`/employees/${employeeId}/status`, {
       is_active: isActive ? 1 : 0,
     });

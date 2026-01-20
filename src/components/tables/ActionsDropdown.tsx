@@ -59,23 +59,39 @@ function ActionsDropdown<T>({
     if (isOpen && buttonRef.current && dropdownRef.current) {
       const updatePosition = () => {
         if (!buttonRef.current || !dropdownRef.current) return;
-        
+
         const buttonRect = buttonRef.current.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
+        const dropdownRect = dropdownRef.current.getBoundingClientRect();
+        const dropdownWidth = dropdownRect.width || 200;
+        const dropdownHeight = dropdownRect.height || 240;
 
-        // Position dropdown to the right of the button
+        // Default position: aligned with button vertically, to the left side (like a context menu)
         let left = buttonRect.right + 8;
         let top = buttonRect.top;
 
         // Adjust if dropdown would go off-screen to the right
-        if (left + 160 > viewportWidth) {
-          left = buttonRect.left - 160 - 8;
+        if (left + dropdownWidth > viewportWidth - 8) {
+          left = buttonRect.left - dropdownWidth - 8;
         }
 
-        // Adjust if dropdown would go off-screen to the bottom
-        if (top + 200 > viewportHeight) {
-          top = viewportHeight - 200 - 8;
+        // If still off-screen to the left, clamp to viewport
+        if (left < 8) {
+          left = Math.max(8, viewportWidth - dropdownWidth - 8);
+        }
+
+        // Preferred: open below the button
+        top = buttonRect.bottom + 8;
+
+        // If dropdown would go off-screen to the bottom, open above the button instead
+        if (top + dropdownHeight > viewportHeight - 8) {
+          top = buttonRect.top - dropdownHeight - 8;
+        }
+
+        // If still off-screen (very small viewport), clamp to top
+        if (top < 8) {
+          top = 8;
         }
 
         dropdownRef.current.style.left = `${left}px`;

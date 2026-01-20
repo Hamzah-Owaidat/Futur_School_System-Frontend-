@@ -8,6 +8,7 @@ import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
+import SelectInput from "@/components/form/SelectInput";
 import { permissionsApi, Permission, CreatePermissionDTO, UpdatePermissionDTO } from "@/lib/api/permissions";
 
 export default function PermissionsPage() {
@@ -21,6 +22,25 @@ export default function PermissionsPage() {
 
   const addEditModal = useModal();
   const viewModal = useModal();
+
+  // Available resources and actions for select inputs
+  const resourceOptions = [
+    { value: "employee", label: "Employee" },
+    { value: "student", label: "Student" },
+    { value: "class", label: "Class" },
+    { value: "role", label: "Role" },
+    { value: "permission", label: "Permission" },
+    { value: "note", label: "Note" },
+  ];
+
+  const actionOptions = [
+    { value: "create", label: "Create" },
+    { value: "read", label: "Read" },
+    { value: "update", label: "Update" },
+    { value: "delete", label: "Delete" },
+    { value: "manage", label: "Manage" },
+    { value: "view", label: "View" },
+  ];
 
   const refetchPermissions = async () => {
     const data = await permissionsApi.getAll();
@@ -297,22 +317,22 @@ export default function PermissionsPage() {
                 />
               </div>
               <div>
-                <Label>Resource</Label>
-                <Input
-                  type="text"
+                <Label htmlFor="resource">Resource</Label>
+                <SelectInput
                   name="resource"
+                  options={resourceOptions}
                   defaultValue={selectedPermission?.resource || ""}
-                  placeholder="e.g. employee"
+                  placeholder="Select resource"
                   required
                 />
               </div>
               <div>
-                <Label>Action</Label>
-                <Input
-                  type="text"
+                <Label htmlFor="action">Action</Label>
+                <SelectInput
                   name="action"
+                  options={actionOptions}
                   defaultValue={selectedPermission?.action || ""}
-                  placeholder="e.g. create"
+                  placeholder="Select action"
                   required
                 />
               </div>
