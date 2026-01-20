@@ -273,9 +273,10 @@ export default function RolesPage() {
     // Example of custom actions - each page can add their own
     customActions: [
       {
-        label: "Manage Permissions",
+        label: "Assign Permissions",
         onClick: (role) => {
-          alert(`Managing permissions for: ${role.name}`);
+          // Open the role edit modal focused on permissions
+          handleEditRole(role);
         },
       },
       {
