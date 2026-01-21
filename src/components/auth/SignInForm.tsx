@@ -9,6 +9,7 @@ import Link from "next/link";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api/axios";
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/toast/ToastProvider";
 import type { ApiError } from "@/lib/api/axios";
 
@@ -23,6 +24,7 @@ export default function SignInForm() {
 
   const router = useRouter();
   const { showToast } = useToast();
+  const { setUser } = useAuth();
 
   const validate = () => {
     let valid = true;
@@ -66,6 +68,22 @@ export default function SignInForm() {
         }
         if (data?.employee) {
           localStorage.setItem("user", JSON.stringify(data.employee));
+        }
+      }
+
+      if (data?.employee) {
+        setUser(data.employee);
+      } else {
+        // fallback: try to read from storage
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("user");
+          if (stored) {
+            try {
+              setUser(JSON.parse(stored));
+            } catch {
+              // ignore parse error
+            }
+          }
         }
       }
 
@@ -223,8 +241,13 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm" disabled={isSubmitting}>
-                    Sign in
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    size="sm"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Signing in..." : "Sign in"}
                   </Button>
                 </div>
               </div>

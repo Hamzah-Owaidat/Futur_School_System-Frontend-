@@ -4,10 +4,12 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
+import { useAuth } from "@/context/AuthContext";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const { user, setUser } = useAuth();
 
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
     e.stopPropagation();
@@ -25,13 +27,25 @@ export default function UserDropdown() {
       localStorage.removeItem("user");
     }
 
+    setUser(null);
     closeDropdown();
     router.push("/auth/signin");
   }
+
+  const displayName =
+    (user?.first_name || user?.last_name) ?
+      `${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim() :
+      user?.email ?? "User";
+
+  const displayEmail = user?.email ?? "No email";
+
   return (
     <div className="relative">
       <button
-        onClick={toggleDropdown} 
+        onClick={toggleDropdown}
+        aria-label={`User menu for ${displayName}`}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
         className="flex items-center text-gray-700 dark:text-gray-400 dropdown-toggle"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
@@ -40,10 +54,14 @@ export default function UserDropdown() {
             height={44}
             src="/images/user/owner.jpg"
             alt="User"
+            priority
+            loading="eager"
           />
         </span>
 
-        <span className="block mr-1 font-medium text-theme-sm">Musharof</span>
+        <span className="block mr-1 font-medium text-theme-sm">
+          {displayName}
+        </span>
 
         <svg
           className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${
@@ -72,10 +90,10 @@ export default function UserDropdown() {
       >
         <div>
           <span className="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
-            Musharof Chowdhury
+            {displayName}
           </span>
           <span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
-            randomuser@pimjo.com
+            {displayEmail}
           </span>
         </div>
 

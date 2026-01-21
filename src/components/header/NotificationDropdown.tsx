@@ -26,6 +26,9 @@ export default function NotificationDropdown() {
       <button
         className="relative dropdown-toggle flex items-center justify-center rounded-full h-11 w-11 bg-transparent hover:bg-[#1a7b9b] border border-gray-300 dark:border-stone-700 text-stone-700 hover:text-white hover:border-none dark:text-white transition-colors"
         onClick={handleClick}
+        aria-label="View notifications"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
       >
         <span
           className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
@@ -60,6 +63,7 @@ export default function NotificationDropdown() {
           </h5>
           <button
             onClick={toggleDropdown}
+            aria-label="Close notifications"
             className="text-gray-500 transition dropdown-toggle dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             <svg
@@ -92,6 +96,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-02.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  loading="lazy"
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>
@@ -238,6 +243,7 @@ export default function NotificationDropdown() {
                   src="/images/user/user-02.jpg"
                   alt="User"
                   className="w-full overflow-hidden rounded-full"
+                  loading="lazy"
                 />
                 <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
               </span>

@@ -765,10 +765,22 @@ span.flatpickr-weekday,
 /* Modal animations */
 .modal {
   animation: modal-overlay-fade 0.18s ease-out;
+  will-change: opacity;
 }
 
 .modal-content {
   animation: modal-scale-in 0.2s ease-out;
+  will-change: transform, opacity;
+}
+
+/* Performance optimizations */
+img {
+  content-visibility: auto;
+}
+
+/* Reduce layout shifts */
+* {
+  box-sizing: border-box;
 }
 
 @keyframes modal-overlay-fade {

@@ -120,7 +120,10 @@ axiosInstance.interceptors.response.use(
     // Extract error message
     const errorMessage =
       error.response?.data?.message ||
-      error.response?.data?.error ||
+      // some backends use `errors` as a string or array; fall back gracefully
+      (typeof error.response?.data?.errors === "string"
+        ? error.response.data.errors
+        : undefined) ||
       error.message ||
       "An unexpected error occurred";
 
