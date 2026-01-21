@@ -22,6 +22,7 @@ export interface ApiError {
 }
 
 // Create axios instance with default config
+// Prefer env; fallback assumes backend on 3000 as in your Postman docs
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api",
   timeout: 30000, // 30 seconds

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   ChevronDownIcon,
   GridIcon,
@@ -20,6 +21,7 @@ type NavItem = {
   icon: React.ReactNode;
   path?: string;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  adminOnly?: boolean;
 };
 
 const navItems: NavItem[] = [
@@ -32,6 +34,12 @@ const navItems: NavItem[] = [
     icon: <GroupIcon />,
     name: "Employees",
     path: "/employees",
+    adminOnly: true,
+  },
+  {
+    icon: <FolderIcon />,
+    name: "Courses",
+    path: "/courses",
   },
   {
     icon: <FolderIcon />,
@@ -43,6 +51,16 @@ const navItems: NavItem[] = [
     name: "Students",
     path: "/students",
   },
+  {
+    icon: <TaskIcon />,
+    name: "Assignments",
+    path: "/class-courses",
+  },
+  {
+    icon: <TaskIcon />,
+    name: "Grades",
+    path: "/grades",
+  },
 ];
 
 const othersItems: NavItem[] = [
@@ -50,24 +68,35 @@ const othersItems: NavItem[] = [
     icon: <TaskIcon />,
     name: "Roles",
     path: "/roles",
+    adminOnly: true,
   },
   {
     icon: <LockIcon />,
     name: "Permissions",
     path: "/permissions",
+    adminOnly: true,
   },
 ];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  const isAdminOrPrincipal =
+    user?.role_name?.toLowerCase() === "admin" ||
+    user?.role_name?.toLowerCase() === "principal";
 
   const renderMenuItems = (
     navItems: NavItem[],
     menuType: "main" | "others"
   ) => (
     <ul className="flex flex-col gap-4">
-      {navItems.map((nav, index) => (
+      {navItems.map((nav, index) => {
+        if (nav.adminOnly && !isAdminOrPrincipal) {
+          return null;
+        }
+        return (
         <li key={nav.name}>
           {nav.subItems ? (
             <button
@@ -184,7 +213,7 @@ const AppSidebar: React.FC = () => {
             </div>
           )}
         </li>
-      ))}
+      )})}
     </ul>
   );
 

@@ -363,18 +363,11 @@ export default function StudentsPage() {
       navigator.clipboard.writeText(student.student_code);
       alert(`Copied: ${student.student_code}`);
     },
-    // Example of custom actions - each page can add their own
     customActions: [
       {
-        label: "View Parent Info",
+        label: "View Grades",
         onClick: (student) => {
-          alert(`Parent: ${student.parent_name}\nPhone: ${student.parent_phone}\nEmail: ${student.parent_email}`);
-        },
-      },
-      {
-        label: "Change Class",
-        onClick: (student) => {
-          alert(`Changing class for: ${student.first_name} ${student.last_name}`);
+          window.location.href = `/students/${student.id}/grades`;
         },
       },
     ],

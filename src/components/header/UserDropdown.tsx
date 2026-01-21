@@ -29,7 +29,7 @@ export default function UserDropdown() {
 
     setUser(null);
     closeDropdown();
-    router.push("/auth/signin");
+    router.push("/signin");
   }
 
   const displayName =
