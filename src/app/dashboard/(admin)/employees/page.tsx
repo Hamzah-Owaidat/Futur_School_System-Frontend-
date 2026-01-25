@@ -44,6 +44,7 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const { showToast } = useToast();
   const addModal = useModal();
   const editModal = useModal();
@@ -104,10 +105,23 @@ export default function EmployeesPage() {
       });
   };
 
+  // Handle field change to clear errors
+  const handleFieldChange = (fieldName: string) => {
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
+
   // Handle add employee
   const handleAddEmployee = () => {
     setSelectedEmployee(null);
     setIsEditMode(false);
+    setFieldErrors({});
+    setError(null);
     addModal.openModal();
   };
 
@@ -166,6 +180,37 @@ export default function EmployeesPage() {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
+    // Client-side validation - check before making any API calls
+    const errors: Record<string, string> = {};
+    
+    // Get form values and trim them
+    const first_name = (formData.get("first_name") as string | null)?.trim() || "";
+    const last_name = (formData.get("last_name") as string | null)?.trim() || "";
+    const email = (formData.get("email") as string | null)?.trim() || "";
+    const password = (formData.get("password") as string | null)?.trim() || "";
+    const hire_date = (formData.get("hire_date") as string | null)?.trim() || "";
+    const role_id = (formData.get("role_id") as string | null)?.trim() || "";
+    const gender = (formData.get("gender") as string | null)?.trim() || "";
+
+    // Validate required fields - check for empty strings explicitly
+    if (first_name === "") errors.first_name = "First name is required";
+    if (last_name === "") errors.last_name = "Last name is required";
+    if (email === "") errors.email = "Email is required";
+    if (!isEditMode && password === "") errors.password = "Password is required";
+    if (hire_date === "") errors.hire_date = "Hire date is required";
+    if (role_id === "") errors.role_id = "Role is required";
+    if (gender === "") errors.gender = "Gender is required";
+
+    // If there are validation errors, set them and stop immediately
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      // Don't show toast for field-level validation errors - only show field errors
+      return; // Stop execution here - don't proceed with API call
+    }
+
+    // Clear any previous errors since validation passed
+    setFieldErrors({});
+
     const saveEmployee = async () => {
       try {
         setIsSaving(true);
@@ -173,17 +218,17 @@ export default function EmployeesPage() {
 
         // Format the payload according to API requirements
         const payload: CreateEmployeeDTO = {
-          first_name: formData.get("first_name") as string,
-          last_name: formData.get("last_name") as string,
-          email: formData.get("email") as string,
-          password: formData.get("password") as string,
-          phone: formData.get("phone") as string,
-          date_of_birth: formData.get("date_of_birth") as string,
-          gender: formData.get("gender") as "male" | "female",
-          address: formData.get("address") as string,
-          hire_date: formData.get("hire_date") as string,
-          salary: parseFloat(formData.get("salary") as string),
-          role_id: parseInt(formData.get("role_id") as string),
+          first_name: first_name!,
+          last_name: last_name!,
+          email: email!,
+          password: password!,
+          phone: (formData.get("phone") as string)?.trim() || "",
+          date_of_birth: (formData.get("date_of_birth") as string)?.trim() || "",
+          gender: gender as "male" | "female",
+          address: (formData.get("address") as string)?.trim() || "",
+          hire_date: hire_date!,
+          salary: parseFloat((formData.get("salary") as string) || "0") || 0,
+          role_id: parseInt(role_id),
         };
 
         if (isEditMode && selectedEmployee) {
@@ -218,6 +263,8 @@ export default function EmployeesPage() {
           editModal.closeModal();
           setSelectedEmployee(null);
           setIsEditMode(false);
+          setFieldErrors({});
+          setError(null);
         } else {
           // Create new employee
           const created = await employeeApi.create(payload);
@@ -246,14 +293,67 @@ export default function EmployeesPage() {
           
           addModal.closeModal();
           form.reset();
+          setFieldErrors({});
+          setError(null);
         }
       } catch (err: any) {
         console.error("Failed to save employee:", err);
-        setError(err?.message || "Failed to save employee");
-        showToast({
-          type: "error",
-          message: err?.message || "Failed to save employee",
-        });
+        
+        // Parse field-level errors from backend
+        const errors: Record<string, string> = {};
+        
+        // Check for errors in different possible locations
+        const errorData = err?.response?.data || err?.data || err;
+        
+        if (errorData?.errors && typeof errorData.errors === "object") {
+          // Backend may return errors as an object with field names as keys
+          Object.keys(errorData.errors).forEach((field) => {
+            const fieldError = errorData.errors[field];
+            if (Array.isArray(fieldError)) {
+              errors[field] = fieldError[0]; // Take first error message
+            } else if (typeof fieldError === "string") {
+              errors[field] = fieldError;
+            }
+          });
+        }
+        
+        // Also check for error message that might contain field information
+        if (Object.keys(errors).length === 0 && errorData?.error) {
+          // Try to parse common error patterns
+          const errorMsg = errorData.error;
+          // Check for common field error patterns like "email is required", "first_name: required", etc.
+          const fieldPatterns = [
+            /(\w+)\s+(?:is\s+)?(?:required|invalid|already exists|must be)/i,
+            /(\w+):\s*(.+)/,
+          ];
+          
+          for (const pattern of fieldPatterns) {
+            const match = errorMsg.match(pattern);
+            if (match) {
+              const fieldName = match[1];
+              errors[fieldName] = errorMsg;
+              break;
+            }
+          }
+        }
+        
+        // If no field errors, set general error
+        if (Object.keys(errors).length === 0) {
+          const errorMessage = err?.message || err?.error || "Failed to save employee";
+          setError(errorMessage);
+          showToast({
+            type: "error",
+            message: errorMessage,
+          });
+        } else {
+          // Set field-level errors
+          setFieldErrors(errors);
+          // Also show a general toast
+          showToast({
+            type: "error",
+            message: "Please fix the errors in the form",
+          });
+        }
       } finally {
         setIsSaving(false);
       }
@@ -521,31 +621,118 @@ export default function EmployeesPage() {
           <form onSubmit={handleSaveEmployee} className="space-y-5">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
-                <Label>First Name</Label>
-                <Input type="text" name="first_name" placeholder="Enter first name" />
+                <Label>
+                  First Name {fieldErrors.first_name && <span className="text-error-500">*</span>}
+                </Label>
+                <Input 
+                  type="text" 
+                  name="first_name" 
+                  placeholder="Enter first name"
+                  onChange={() => handleFieldChange("first_name")}
+                  className={
+                    !fieldErrors.first_name
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.first_name && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.first_name}</p>
+                )}
               </div>
               <div>
-                <Label>Last Name</Label>
-                <Input type="text" name="last_name" placeholder="Enter last name" />
+                <Label>
+                  Last Name {fieldErrors.last_name && <span className="text-error-500">*</span>}
+                </Label>
+                <Input 
+                  type="text" 
+                  name="last_name" 
+                  placeholder="Enter last name"
+                  onChange={() => handleFieldChange("last_name")}
+                  className={
+                    !fieldErrors.last_name
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.last_name && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.last_name}</p>
+                )}
               </div>
               <div>
-                <Label>Email</Label>
-                <Input type="email" name="email" placeholder="Enter email address" />
+                <Label>
+                  Email {fieldErrors.email && <span className="text-error-500">*</span>}
+                </Label>
+                <Input 
+                  type="email" 
+                  name="email" 
+                  placeholder="Enter email address"
+                  onChange={() => handleFieldChange("email")}
+                  className={
+                    !fieldErrors.email
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.email && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.email}</p>
+                )}
               </div>
               <div>
-                <Label>Password</Label>
-                <Input type="password" name="password" placeholder="Enter password" />
+                <Label>
+                  Password {fieldErrors.password && <span className="text-error-500">*</span>}
+                </Label>
+                <Input 
+                  type="password" 
+                  name="password" 
+                  placeholder="Enter password"
+                  onChange={() => handleFieldChange("password")}
+                  className={
+                    !fieldErrors.password
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.password && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.password}</p>
+                )}
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input type="text" name="phone" placeholder="Enter phone number" />
+                <Input 
+                  type="text" 
+                  name="phone" 
+                  placeholder="Enter phone number"
+                  onChange={() => handleFieldChange("phone")}
+                  className={
+                    !fieldErrors.phone
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.phone && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.phone}</p>
+                )}
               </div>
               <div>
                 <Label>Date of Birth</Label>
-                <Input type="date" name="date_of_birth" />
+                <Input 
+                  type="date" 
+                  name="date_of_birth"
+                  onChange={() => handleFieldChange("date_of_birth")}
+                  className={
+                    !fieldErrors.date_of_birth
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.date_of_birth && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.date_of_birth}</p>
+                )}
               </div>
               <div>
-                <Label>Gender</Label>
+                <Label>
+                  Gender {fieldErrors.gender && <span className="text-error-500">*</span>}
+                </Label>
                 <SelectInput
                   name="gender"
                   options={[
@@ -554,10 +741,17 @@ export default function EmployeesPage() {
                   ]}
                   placeholder="Select gender"
                   required
+                  onChange={() => handleFieldChange("gender")}
+                  error={!!fieldErrors.gender}
                 />
+                {fieldErrors.gender && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.gender}</p>
+                )}
               </div>
               <div>
-                <Label>Role</Label>
+                <Label>
+                  Role {fieldErrors.role_id && <span className="text-error-500">*</span>}
+                </Label>
                 <SelectInput
                   name="role_id"
                   options={roles
@@ -568,19 +762,65 @@ export default function EmployeesPage() {
                     }))}
                   placeholder="Select role"
                   required
+                  onChange={() => handleFieldChange("role_id")}
+                  error={!!fieldErrors.role_id}
                 />
+                {fieldErrors.role_id && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.role_id}</p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <Label>Address</Label>
-                <Input type="text" name="address" placeholder="Enter address" />
+                <Input 
+                  type="text" 
+                  name="address" 
+                  placeholder="Enter address"
+                  onChange={() => handleFieldChange("address")}
+                  className={
+                    !fieldErrors.address
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.address && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.address}</p>
+                )}
               </div>
               <div>
-                <Label>Hire Date</Label>
-                <Input type="date" name="hire_date" />
+                <Label>
+                  Hire Date {fieldErrors.hire_date && <span className="text-error-500">*</span>}
+                </Label>
+                <Input 
+                  type="date" 
+                  name="hire_date"
+                  onChange={() => handleFieldChange("hire_date")}
+                  className={
+                    !fieldErrors.hire_date
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.hire_date && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.hire_date}</p>
+                )}
               </div>
               <div>
                 <Label>Salary</Label>
-                <Input type="number" name="salary" placeholder="Enter salary" step={0.01} />
+                <Input 
+                  type="number" 
+                  name="salary" 
+                  placeholder="Enter salary" 
+                  step={0.01}
+                  onChange={() => handleFieldChange("salary")}
+                  className={
+                    !fieldErrors.salary
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
+                />
+                {fieldErrors.salary && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.salary}</p>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-4">
@@ -613,60 +853,117 @@ export default function EmployeesPage() {
           <form onSubmit={handleSaveEmployee} className="space-y-5">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
-                <Label>First Name</Label>
+                <Label>
+                  First Name {fieldErrors.first_name && <span className="text-error-500">*</span>}
+                </Label>
                 <Input 
                   type="text" 
                   name="first_name" 
-                  defaultValue={selectedEmployee?.first_name || ""} 
-                 
+                  defaultValue={selectedEmployee?.first_name || ""}
+                  onChange={() => handleFieldChange("first_name")}
+                  className={
+                    !fieldErrors.first_name
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.first_name && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.first_name}</p>
+                )}
               </div>
               <div>
-                <Label>Last Name</Label>
+                <Label>
+                  Last Name {fieldErrors.last_name && <span className="text-error-500">*</span>}
+                </Label>
                 <Input 
                   type="text" 
                   name="last_name" 
-                  defaultValue={selectedEmployee?.last_name || ""} 
-                 
+                  defaultValue={selectedEmployee?.last_name || ""}
+                  onChange={() => handleFieldChange("last_name")}
+                  className={
+                    !fieldErrors.last_name
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.last_name && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.last_name}</p>
+                )}
               </div>
               <div>
-                <Label>Email</Label>
+                <Label>
+                  Email {fieldErrors.email && <span className="text-error-500">*</span>}
+                </Label>
                 <Input 
                   type="email" 
                   name="email" 
-                  defaultValue={selectedEmployee?.email || ""} 
-                 
+                  defaultValue={selectedEmployee?.email || ""}
+                  onChange={() => handleFieldChange("email")}
+                  className={
+                    !fieldErrors.email
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.email && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.email}</p>
+                )}
               </div>
               <div>
                 <Label>Password (leave blank to keep current)</Label>
                 <Input 
                   type="password" 
                   name="password" 
-                  placeholder="Enter new password (optional)" 
+                  placeholder="Enter new password (optional)"
+                  onChange={() => handleFieldChange("password")}
+                  className={
+                    !fieldErrors.password
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.password && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.password}</p>
+                )}
               </div>
               <div>
                 <Label>Phone</Label>
                 <Input 
                   type="text" 
                   name="phone" 
-                  defaultValue={selectedEmployee?.phone || ""} 
-                 
+                  defaultValue={selectedEmployee?.phone || ""}
+                  onChange={() => handleFieldChange("phone")}
+                  className={
+                    !fieldErrors.phone
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.phone && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.phone}</p>
+                )}
               </div>
               <div>
                 <Label>Date of Birth</Label>
                 <Input 
                   type="date" 
                   name="date_of_birth" 
-                  defaultValue={selectedEmployee?.date_of_birth ? new Date(selectedEmployee.date_of_birth).toISOString().split('T')[0] : ""} 
-                 
+                  defaultValue={selectedEmployee?.date_of_birth ? new Date(selectedEmployee.date_of_birth).toISOString().split('T')[0] : ""}
+                  onChange={() => handleFieldChange("date_of_birth")}
+                  className={
+                    !fieldErrors.date_of_birth
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.date_of_birth && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.date_of_birth}</p>
+                )}
               </div>
               <div>
-                <Label>Gender</Label>
+                <Label>
+                  Gender {fieldErrors.gender && <span className="text-error-500">*</span>}
+                </Label>
                 <SelectInput
                   name="gender"
                   options={[
@@ -676,10 +973,17 @@ export default function EmployeesPage() {
                   placeholder="Select gender"
                   defaultValue={selectedEmployee?.gender || ""}
                   required
+                  onChange={() => handleFieldChange("gender")}
+                  error={!!fieldErrors.gender}
                 />
+                {fieldErrors.gender && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.gender}</p>
+                )}
               </div>
               <div>
-                <Label>Role</Label>
+                <Label>
+                  Role {fieldErrors.role_id && <span className="text-error-500">*</span>}
+                </Label>
                 <SelectInput
                   name="role_id"
                   options={roles
@@ -696,25 +1000,48 @@ export default function EmployeesPage() {
                   placeholder="Select role"
                   defaultValue={selectedEmployee?.role_id !== undefined ? selectedEmployee.role_id : ""}
                   required
+                  onChange={() => handleFieldChange("role_id")}
+                  error={!!fieldErrors.role_id}
                 />
+                {fieldErrors.role_id && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.role_id}</p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <Label>Address</Label>
                 <Input 
                   type="text" 
                   name="address" 
-                  defaultValue={selectedEmployee?.address || ""} 
-                   
+                  defaultValue={selectedEmployee?.address || ""}
+                  onChange={() => handleFieldChange("address")}
+                  className={
+                    !fieldErrors.address
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.address && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.address}</p>
+                )}
               </div>
               <div>       
-                <Label>Hire Date</Label>
+                <Label>
+                  Hire Date {fieldErrors.hire_date && <span className="text-error-500">*</span>}
+                </Label>
                 <Input 
                   type="date" 
                   name="hire_date" 
-                  defaultValue={selectedEmployee?.hire_date ? new Date(selectedEmployee.hire_date).toISOString().split('T')[0] : ""} 
-                   
+                  defaultValue={selectedEmployee?.hire_date ? new Date(selectedEmployee.hire_date).toISOString().split('T')[0] : ""}
+                  onChange={() => handleFieldChange("hire_date")}
+                  className={
+                    !fieldErrors.hire_date
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.hire_date && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.hire_date}</p>
+                )}
               </div>
               <div>
                 <Label>Salary</Label> 
@@ -722,9 +1049,17 @@ export default function EmployeesPage() {
                   type="number" 
                   name="salary" 
                   defaultValue={selectedEmployee?.salary ? (selectedEmployee.salary as string | number) : ""} 
-                  step={0.01} 
-                   
+                  step={0.01}
+                  onChange={() => handleFieldChange("salary")}
+                  className={
+                    !fieldErrors.salary
+                      ? `border-l-[3px] border-l-green-700 dark:border-l-green-500`
+                      : `border-l-[3px] border-l-red-500 dark:border-l-red-500`
+                  }
                 />
+                {fieldErrors.salary && (
+                  <p className="text-error-500 text-sm pt-2">{fieldErrors.salary}</p>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-4">

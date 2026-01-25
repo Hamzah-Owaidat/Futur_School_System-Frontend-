@@ -81,7 +81,9 @@ axiosInstance.interceptors.response.use(
 
     // Log error in development
     if (process.env.NODE_ENV === "development") {
-      console.error(`❌ ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+      const method = error.config?.method?.toUpperCase() || "UNKNOWN";
+      const url = error.config?.url || "unknown endpoint";
+      console.error(`❌ ${method} ${url}`, {
         status: error.response?.status,
         error: error.response?.data || error.message,
       });
