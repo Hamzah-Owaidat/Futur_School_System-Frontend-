@@ -58,8 +58,8 @@ export default function StudentGradesPage() {
         const [stu, courseNotes, allClasses, allCourses] = await Promise.all([
           studentsApi.getById(studentId),
           courseNotesApi.getByStudent(studentId),
-          classesApi.getAll(),
-          coursesApi.getAll(),
+          classesApi.getAll({ show_all: false }),
+          coursesApi.getAll({ show_all: false }),
         ]);
         setStudent(stu);
         setNotes(courseNotes);

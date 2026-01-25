@@ -11,6 +11,7 @@ import Label from "@/components/form/Label";
 import SelectInput from "@/components/form/SelectInput";
 import { studentsApi, Student, CreateStudentDTO, UpdateStudentDTO } from "@/lib/api/students";
 import { classesApi, Class } from "@/lib/api/classes";
+import { useToast } from "@/components/ui/toast/ToastProvider";
 
 // Format date helper
 const formatDate = (dateString: string): string => {
@@ -32,6 +33,7 @@ export default function StudentsPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const addModal = useModal();
   const editModal = useModal();
   const viewModal = useModal();
@@ -43,8 +45,8 @@ export default function StudentsPage() {
         setIsLoading(true);
         setError(null);
         const [studentsData, classesData] = await Promise.all([
-          studentsApi.getAll(),
-          classesApi.getAll(),
+          studentsApi.getAll({ show_all: false }),
+          classesApi.getAll({ show_all: false }),
         ]);
         setStudents(studentsData);
         setClasses(classesData);
@@ -60,7 +62,7 @@ export default function StudentsPage() {
   }, []);
 
   const refetchStudents = async () => {
-    const data = await studentsApi.getAll();
+    const data = await studentsApi.getAll({ show_all: false });
     setStudents(data);
   };
 
@@ -87,7 +89,10 @@ export default function StudentsPage() {
               : student
           )
         );
-        alert(err?.message || "Failed to update student status");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to update student status",
+        });
       });
   };
 
@@ -108,7 +113,10 @@ export default function StudentsPage() {
       editModal.openModal();
     } catch (err: any) {
       console.error("Failed to load student details:", err);
-      alert(err?.message || "Failed to load student details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load student details",
+      });
     }
   };
 
@@ -121,7 +129,10 @@ export default function StudentsPage() {
       viewModal.openModal();
     } catch (err: any) {
       console.error("Failed to load student details:", err);
-      alert(err?.message || "Failed to load student details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load student details",
+      });
     }
   };
 
@@ -162,7 +173,7 @@ export default function StudentsPage() {
 
           // Refetch students to ensure we have complete data
           try {
-            const refreshedStudents = await studentsApi.getAll();
+            const refreshedStudents = await studentsApi.getAll({ show_all: false });
             setStudents(refreshedStudents);
           } catch (refreshError) {
             console.warn("Failed to refresh students list:", refreshError);
@@ -185,7 +196,10 @@ export default function StudentsPage() {
       } catch (err: any) {
         console.error("Failed to save student:", err);
         setError(err?.message || "Failed to save student");
-        alert(err?.message || "Failed to save student");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to save student",
+        });
       } finally {
         setIsSaving(false);
       }
@@ -339,7 +353,10 @@ export default function StudentsPage() {
           setStudents((prev) => prev.filter((stu) => stu.id !== student.id));
         } catch (err: any) {
           console.error("Failed to delete student:", err);
-          alert(err?.message || "Failed to delete student");
+          showToast({
+            type: "error",
+            message: err?.message || "Failed to delete student",
+          });
         }
       };
 
@@ -361,13 +378,17 @@ export default function StudentsPage() {
     onCopyId: (student) => {
       // Copy student code to clipboard
       navigator.clipboard.writeText(student.student_code);
-      alert(`Copied: ${student.student_code}`);
+      navigator.clipboard.writeText(student.student_code);
+      showToast({
+        type: "success",
+        message: `Copied: ${student.student_code}`,
+      });
     },
     customActions: [
       {
         label: "View Grades",
         onClick: (student) => {
-          window.location.href = `/students/${student.id}/grades`;
+          window.location.href = `/dashboard/students/${student.id}/grades`;
         },
       },
     ],

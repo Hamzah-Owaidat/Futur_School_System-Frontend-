@@ -7,7 +7,7 @@ import axios, {
 } from "axios";
 
 // API Response Type
-export interface ApiResponse<T = any> {
+export interface  ApiResponse<T = any> {
   data: T;
   message?: string;
   success?: boolean;
@@ -22,9 +22,9 @@ export interface ApiError {
 }
 
 // Create axios instance with default config
-// Prefer env; fallback assumes backend on 3000 as in your Postman docs
+// Prefer env; fallback assumes backend on 8080
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api",
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api",
   timeout: 30000, // 30 seconds
   headers: {
     "Content-Type": "application/json",
@@ -88,18 +88,21 @@ axiosInstance.interceptors.response.use(
     }
 
     // Handle 401 Unauthorized - Token expired or invalid
+    // Don't redirect if we're already on the login page (login endpoint)
     if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      // Clear token and redirect to login
-      if (typeof window !== "undefined") {
+      const isLoginRequest = originalRequest.url?.includes("/auth/login");
+      
+      // Only redirect if it's not a login request (i.e., token expired on protected route)
+      if (!isLoginRequest && typeof window !== "undefined") {
+        originalRequest._retry = true;
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         // Redirect to login page
-        window.location.href = "/signin";
+        window.location.href = "/auth/signin";
       }
 
-      return Promise.reject(error);
+      // For login requests, let the error pass through to the component
+      // Don't reject here, let it be handled by the component
     }
 
     // Handle 403 Forbidden
@@ -119,11 +122,14 @@ axiosInstance.interceptors.response.use(
     }
 
     // Extract error message
+    // Backend may return either 'error' or 'message' field
+    const errorData = error.response?.data as any;
     const errorMessage =
-      error.response?.data?.message ||
+      errorData?.message ||
+      errorData?.error ||
       // some backends use `errors` as a string or array; fall back gracefully
-      (typeof error.response?.data?.errors === "string"
-        ? error.response.data.errors
+      (typeof errorData?.errors === "string"
+        ? errorData.errors
         : undefined) ||
       error.message ||
       "An unexpected error occurred";

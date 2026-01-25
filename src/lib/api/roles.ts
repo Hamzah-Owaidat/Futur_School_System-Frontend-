@@ -32,8 +32,11 @@ export interface Permission {
 // Roles API Service
 export const rolesApi = {
   // Get all roles
-  getAll: async (): Promise<Role[]> => {
-    const response = await api.get("/roles");
+  getAll: async (activeOnly?: boolean, showAll?: boolean): Promise<Role[]> => {
+    const params: Record<string, any> = {};
+    if (activeOnly) params.active_only = "true";
+    if (showAll !== undefined) params.show_all = showAll;
+    const response = await api.get("/roles", { params });
     const payload: any = response.data;
 
     // Expected shape:

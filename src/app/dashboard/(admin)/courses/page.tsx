@@ -38,7 +38,7 @@ export default function CoursesPage() {
   const fetchCourses = async () => {
     try {
       setIsLoading(true);
-      const data = await coursesApi.getAll({ limit: 200 });
+      const data = await coursesApi.getAll({ limit: 200, show_all: false });
       setCourses(data);
     } catch (error) {
       console.error("Failed to fetch courses", error);

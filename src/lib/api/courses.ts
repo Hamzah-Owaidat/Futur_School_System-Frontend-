@@ -34,6 +34,8 @@ export interface GetCoursesParams {
   limit?: number;
   search?: string;
   is_active?: boolean;
+  active_only?: boolean;
+  show_all?: boolean;
 }
 
 export interface CreateCourseDTO {
@@ -55,6 +57,8 @@ export const coursesApi = {
         limit: params?.limit ?? 100,
         search: params?.search ?? "",
         is_active: params?.is_active,
+        active_only: params?.active_only,
+        show_all: params?.show_all,
       },
     });
 

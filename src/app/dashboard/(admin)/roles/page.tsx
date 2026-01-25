@@ -11,6 +11,7 @@ import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
 import { rolesApi, Role, Permission } from "@/lib/api/roles";
 import { permissionsApi, GroupedPermissions } from "@/lib/api/permissions";
+import { useToast } from "@/components/ui/toast/ToastProvider";
 
 interface RoleWithCounts extends Role {
   employee_count?: number;
@@ -29,6 +30,7 @@ export default function RolesPage() {
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>([]);
   const [roleActive, setRoleActive] = useState<boolean>(true);
 
+  const { showToast } = useToast();
   const addEditModal = useModal();
   const viewModal = useModal();
 
@@ -38,7 +40,7 @@ export default function RolesPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await rolesApi.getAll();
+        const data = await rolesApi.getAll(false, false); // activeOnly=false, showAll=false (exclude deleted)
         setRoles(data);
       } catch (err: any) {
         console.error("Failed to fetch roles:", err);
@@ -53,7 +55,7 @@ export default function RolesPage() {
 
   // Refetch helper
   const refetchRoles = async () => {
-    const data = await rolesApi.getAll();
+    const data = await rolesApi.getAll(false, false); // activeOnly=false, showAll=false (exclude deleted)
     setRoles(data);
   };
 
@@ -72,7 +74,10 @@ export default function RolesPage() {
           role.id === roleId ? { ...role, is_active: newStatus ? 0 : 1 } : role
         )
       );
-      alert(err?.message || "Failed to update role status");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to update role status",
+      });
     });
   };
 
@@ -111,7 +116,10 @@ export default function RolesPage() {
       addEditModal.openModal();
     } catch (err: any) {
       console.error("Failed to load role details:", err);
-      alert(err?.message || "Failed to load role details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load role details",
+      });
     }
   };
 
@@ -123,7 +131,10 @@ export default function RolesPage() {
       viewModal.openModal();
     } catch (err: any) {
       console.error("Failed to load role details:", err);
-      alert(err?.message || "Failed to load role details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load role details",
+      });
     }
   };
 
@@ -137,7 +148,10 @@ export default function RolesPage() {
         })
         .catch((err) => {
           console.error("Failed to delete role:", err);
-          alert(err?.message || "Failed to delete role");
+          showToast({
+            type: "error",
+            message: err?.message || "Failed to delete role",
+          });
         });
     }
   };
@@ -172,7 +186,10 @@ export default function RolesPage() {
       } catch (err: any) {
         console.error("Failed to save role:", err);
         setError(err?.message || "Failed to save role");
-        alert(err?.message || "Failed to save role");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to save role",
+        });
       } finally {
         setIsSaving(false);
       }
@@ -268,7 +285,11 @@ export default function RolesPage() {
     onCopyId: (role) => {
       // Copy role ID to clipboard
       navigator.clipboard.writeText(role.id.toString());
-      alert(`Copied ID: ${role.id}`);
+      navigator.clipboard.writeText(String(role.id));
+      showToast({
+        type: "success",
+        message: `Copied ID: ${role.id}`,
+      });
     },
     // Example of custom actions - each page can add their own
     customActions: [
@@ -282,7 +303,10 @@ export default function RolesPage() {
       {
         label: "View Employees",
         onClick: (role) => {
-          alert(`Viewing ${role.employee_count} employee(s) with role: ${role.name}`);
+          showToast({
+            type: "info",
+            message: `Viewing ${role.employee_count} employee(s) with role: ${role.name}`,
+          });
         },
       },
     ],

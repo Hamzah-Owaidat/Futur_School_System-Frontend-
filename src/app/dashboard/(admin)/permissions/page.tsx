@@ -10,6 +10,7 @@ import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
 import SelectInput from "@/components/form/SelectInput";
 import { permissionsApi, Permission, CreatePermissionDTO, UpdatePermissionDTO } from "@/lib/api/permissions";
+import { useToast } from "@/components/ui/toast/ToastProvider";
 
 export default function PermissionsPage() {
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -20,6 +21,7 @@ export default function PermissionsPage() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { showToast } = useToast();
   const addEditModal = useModal();
   const viewModal = useModal();
 
@@ -44,6 +46,7 @@ export default function PermissionsPage() {
 
   const refetchPermissions = async () => {
     const data = await permissionsApi.getAll();
+    // Filter out deleted permissions (those with deleted_at) - backend should handle this
     setPermissions(data);
   };
 
@@ -78,7 +81,10 @@ export default function PermissionsPage() {
       addEditModal.openModal();
     } catch (err: any) {
       console.error("Failed to load permission details:", err);
-      alert(err?.message || "Failed to load permission details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load permission details",
+      });
     }
   };
 
@@ -89,7 +95,10 @@ export default function PermissionsPage() {
       viewModal.openModal();
     } catch (err: any) {
       console.error("Failed to load permission details:", err);
-      alert(err?.message || "Failed to load permission details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load permission details",
+      });
     }
   };
 
@@ -102,7 +111,10 @@ export default function PermissionsPage() {
         })
         .catch((err: any) => {
           console.error("Failed to delete permission:", err);
-          alert(err?.message || "Failed to delete permission");
+          showToast({
+            type: "error",
+            message: err?.message || "Failed to delete permission",
+          });
         });
     }
   };
@@ -142,7 +154,10 @@ export default function PermissionsPage() {
       } catch (err: any) {
         console.error("Failed to save permission:", err);
         setError(err?.message || "Failed to save permission");
-        alert(err?.message || "Failed to save permission");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to save permission",
+        });
       } finally {
         setIsSaving(false);
       }
@@ -240,20 +255,30 @@ export default function PermissionsPage() {
     onCopyId: (permission) => {
       // Copy permission ID to clipboard
       navigator.clipboard.writeText(permission.id.toString());
-      alert(`Copied ID: ${permission.id}`);
+      navigator.clipboard.writeText(String(permission.id));
+      showToast({
+        type: "success",
+        message: `Copied ID: ${permission.id}`,
+      });
     },
     // Example of custom actions - each page can add their own
     customActions: [
       {
         label: "View Roles",
         onClick: (permission) => {
-          alert(`Viewing ${permission.role_count} role(s) with permission: ${permission.name}`);
+          showToast({
+            type: "info",
+            message: `Viewing ${permission.role_count} role(s) with permission: ${permission.name}`,
+          });
         },
       },
       {
         label: "Manage Access",
         onClick: (permission) => {
-          alert(`Managing access for: ${permission.name}`);
+          showToast({
+            type: "info",
+            message: `Managing access for: ${permission.name}`,
+          });
         },
       },
     ],

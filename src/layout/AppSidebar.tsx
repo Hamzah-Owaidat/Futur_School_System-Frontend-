@@ -33,33 +33,33 @@ const navItems: NavItem[] = [
   {
     icon: <GroupIcon />,
     name: "Employees",
-    path: "/employees",
+    path: "/dashboard/employees",
     adminOnly: true,
   },
   {
     icon: <FolderIcon />,
     name: "Courses",
-    path: "/courses",
+    path: "/dashboard/courses",
   },
   {
     icon: <FolderIcon />,
     name: "Classes",
-    path: "/classes",
+    path: "/dashboard/classes",
   },
   {
     icon: <UserIcon />,
     name: "Students",
-    path: "/students",
+    path: "/dashboard/students",
   },
   {
     icon: <TaskIcon />,
     name: "Assignments",
-    path: "/class-courses",
+    path: "/dashboard/class-courses",
   },
   {
     icon: <TaskIcon />,
     name: "Grades",
-    path: "/grades",
+    path: "/dashboard/grades",
   },
 ];
 
@@ -67,13 +67,13 @@ const othersItems: NavItem[] = [
   {
     icon: <TaskIcon />,
     name: "Roles",
-    path: "/roles",
+    path: "/dashboard/roles",
     adminOnly: true,
   },
   {
     icon: <LockIcon />,
     name: "Permissions",
-    path: "/permissions",
+    path: "/dashboard/permissions",
     adminOnly: true,
   },
 ];
@@ -306,7 +306,7 @@ const AppSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/">
+        <Link href="/dashboard">
           {isExpanded || isHovered || isMobileOpen ? (
             <>
               <Image

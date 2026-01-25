@@ -379,7 +379,7 @@ export default function NotificationDropdown() {
           {/* Add more items as needed */}
         </ul>
         <Link
-          href="/"
+          href="/dashboard"
           className="block px-4 py-2 mt-3 text-sm font-medium text-center text-white bg-[#1a7b9b] rounded-lg "
         >
           View All Notifications

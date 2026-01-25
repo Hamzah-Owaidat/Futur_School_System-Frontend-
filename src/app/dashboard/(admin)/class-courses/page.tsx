@@ -78,9 +78,9 @@ export default function ClassCoursesPage() {
   const loadReferenceData = async () => {
     try {
       const [classesData, coursesData, employeesData] = await Promise.all([
-        classesApi.getAll(),
-        coursesApi.getAll(),
-        employeeApi.getAll(),
+        classesApi.getAll({ show_all: false }),
+        coursesApi.getAll({ show_all: false }),
+        employeeApi.getAll({ show_all: false }),
       ]);
 
       setClasses(classesData);
@@ -104,7 +104,9 @@ export default function ClassCoursesPage() {
     try {
       setIsLoading(true);
 
-      const params: any = {};
+      const params: any = {
+        show_all: false, // Exclude deleted records
+      };
       if (filters.academic_year) params.academic_year = filters.academic_year;
       if (filters.class_id) params.class_id = parseInt(filters.class_id, 10);
       if (filters.course_id) params.course_id = parseInt(filters.course_id, 10);

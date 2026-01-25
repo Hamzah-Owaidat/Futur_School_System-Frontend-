@@ -31,6 +31,7 @@ export interface GetClassCoursesParams {
   teacher_id?: number;
   academic_year?: string;
   is_active?: boolean;
+  show_all?: boolean;
 }
 
 export interface CreateClassCourseDTO {

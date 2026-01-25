@@ -67,8 +67,8 @@ export default function GradesPage() {
           );
 
           const [allClasses, allCourses] = await Promise.all([
-            classesApi.getAll(),
-            coursesApi.getAll(),
+            classesApi.getAll({ show_all: false }),
+            coursesApi.getAll({ show_all: false }),
           ]);
 
           setClasses(allClasses.filter((cls) => uniqueClassIds.includes(cls.id)));
@@ -76,8 +76,8 @@ export default function GradesPage() {
         } else {
           // Admin / principal: all classes and courses
           const [allClasses, allCourses] = await Promise.all([
-            classesApi.getAll(),
-            coursesApi.getAll(),
+            classesApi.getAll({ show_all: false }),
+            coursesApi.getAll({ show_all: false }),
           ]);
           setClasses(allClasses);
           setCourses(allCourses);

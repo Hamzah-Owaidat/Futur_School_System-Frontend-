@@ -49,6 +49,7 @@ export interface GetStudentsParams {
   search?: string;
   class_id?: number;
   is_active?: boolean;
+  show_all?: boolean;
 }
 
 export interface CreateStudentDTO {
@@ -75,7 +76,16 @@ export interface UpdateStudentDTO extends Partial<CreateStudentDTO> {
 export const studentsApi = {
   // Get all students
   getAll: async (params?: GetStudentsParams): Promise<Student[]> => {
-    const response = await api.get("/students", { params });
+    const response = await api.get("/students", {
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search,
+        class_id: params?.class_id,
+        is_active: params?.is_active,
+        show_all: params?.show_all,
+      },
+    });
     const payload: any = response.data;
 
     // Expected shape:

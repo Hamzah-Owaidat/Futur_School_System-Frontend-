@@ -11,6 +11,7 @@ import Label from "@/components/form/Label";
 import SelectInput from "@/components/form/SelectInput";
 import { employeeApi, Employee, CreateEmployeeDTO } from "@/lib/api/employees";
 import { rolesApi, Role } from "@/lib/api/roles";
+import { useToast } from "@/components/ui/toast/ToastProvider";
 
 // Format date helper
 const formatDate = (dateString: string): string => {
@@ -36,12 +37,14 @@ const formatCurrency = (amount: string): string => {
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [allRoles, setAllRoles] = useState<Role[]>([]); // Store all roles for edge cases
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [viewEmployee, setViewEmployee] = useState<Employee | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const addModal = useModal();
   const editModal = useModal();
   const viewModal = useModal();
@@ -52,12 +55,14 @@ export default function EmployeesPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const [employeesData, rolesData] = await Promise.all([
-          employeeApi.getAll(),
-          rolesApi.getAll(),
+        const [employeesData, activeRolesData, allRolesData] = await Promise.all([
+          employeeApi.getAll({ show_all: false }),
+          rolesApi.getAll(true), // Only active roles for dropdown
+          rolesApi.getAll(false), // All roles for reference
         ]);
         setEmployees(employeesData);
-        setRoles(rolesData);
+        setRoles(activeRolesData);
+        setAllRoles(allRolesData);
       } catch (err: any) {
         console.error("Failed to fetch data:", err);
         setError(err?.message || "Failed to load data");
@@ -92,7 +97,10 @@ export default function EmployeesPage() {
               : emp
           )
         );
-        alert(err?.message || "Failed to update employee status");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to update employee status",
+        });
       });
   };
 
@@ -110,10 +118,29 @@ export default function EmployeesPage() {
       // Fetch full employee details by numeric ID to ensure we have all fields
       const details = await employeeApi.getById(employee.id);
       setSelectedEmployee(details);
+      
+      // If employee's current role is inactive, include it in the roles list for the dropdown
+      if (details.role_id) {
+        const currentRole = allRoles.find(r => r.id === details.role_id);
+        if (currentRole && currentRole.is_active === 0) {
+          // Add inactive role to the roles list if not already present
+          setRoles(prev => {
+            const exists = prev.some(r => r.id === currentRole.id);
+            if (!exists) {
+              return [...prev, currentRole];
+            }
+            return prev;
+          });
+        }
+      }
+      
       editModal.openModal();
     } catch (err: any) {
       console.error("Failed to load employee details:", err);
-      alert(err?.message || "Failed to load employee details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load employee details",
+      });
     }
   };
 
@@ -126,7 +153,10 @@ export default function EmployeesPage() {
       viewModal.openModal();
     } catch (err: any) {
       console.error("Failed to load employee details:", err);
-      alert(err?.message || "Failed to load employee details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load employee details",
+      });
     }
   };
 
@@ -173,7 +203,7 @@ export default function EmployeesPage() {
           
           // Refetch employees to ensure we have complete data
           try {
-            const refreshedEmployees = await employeeApi.getAll();
+            const refreshedEmployees = await employeeApi.getAll({ show_all: false });
             setEmployees(refreshedEmployees);
           } catch (refreshError) {
             console.warn("Failed to refresh employees list:", refreshError);
@@ -205,7 +235,7 @@ export default function EmployeesPage() {
           // Refetch employees to ensure we have complete data from server
           // This ensures the new employee appears in the table with all fields
           try {
-            const refreshedEmployees = await employeeApi.getAll();
+            const refreshedEmployees = await employeeApi.getAll({ show_all: false });
             console.log("Refreshed employees:", refreshedEmployees);
             setEmployees(refreshedEmployees);
           } catch (refreshError) {
@@ -220,7 +250,10 @@ export default function EmployeesPage() {
       } catch (err: any) {
         console.error("Failed to save employee:", err);
         setError(err?.message || "Failed to save employee");
-        alert(err?.message || "Failed to save employee");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to save employee",
+        });
       } finally {
         setIsSaving(false);
       }
@@ -370,15 +403,39 @@ export default function EmployeesPage() {
       ) {
         const deleteEmployee = async () => {
           try {
-            await employeeApi.delete(employee.id);
+            // Optimistically update the employee status to inactive (soft delete)
             setEmployees((prev) =>
-              prev.filter(
-                (emp) => emp.employee_code !== employee.employee_code
+              prev.map((emp) =>
+                emp.id === employee.id
+                  ? { ...emp, is_active: 0 }
+                  : emp
               )
             );
+
+            await employeeApi.delete(employee.id);
+            
+            // Optionally refetch to ensure consistency with backend
+            try {
+              const refreshedEmployees = await employeeApi.getAll({ show_all: false });
+              setEmployees(refreshedEmployees);
+            } catch (refreshError) {
+              console.warn("Failed to refresh employees list:", refreshError);
+              // Keep the optimistic update if refresh fails
+            }
           } catch (err: any) {
             console.error("Failed to delete employee:", err);
-            alert(err?.message || "Failed to delete employee");
+            // Revert the optimistic update on error
+            setEmployees((prev) =>
+              prev.map((emp) =>
+                emp.id === employee.id
+                  ? { ...emp, is_active: employee.is_active }
+                  : emp
+              )
+            );
+            showToast({
+              type: "error",
+              message: err?.message || "Failed to delete employee",
+            });
           }
         };
 
@@ -388,20 +445,30 @@ export default function EmployeesPage() {
     onCopyId: (employee) => {
       // Copy employee code to clipboard
       navigator.clipboard.writeText(employee.employee_code);
-      alert(`Copied: ${employee.employee_code}`);
+      navigator.clipboard.writeText(employee.employee_code);
+      showToast({
+        type: "success",
+        message: `Copied: ${employee.employee_code}`,
+      });
     },
     // Example of custom actions - each page can add their own
     customActions: [
       {
         label: "Send Email",
         onClick: (employee) => {
-          alert(`Sending email to: ${employee.email}`);
+          showToast({
+            type: "info",
+            message: `Sending email to: ${employee.email}`,
+          });
         },
       },
       {
         label: "View Profile",
         onClick: (employee) => {
-          alert(`Opening profile for: ${employee.first_name} ${employee.last_name}`);
+          showToast({
+            type: "info",
+            message: `Opening profile for: ${employee.first_name} ${employee.last_name}`,
+          });
         },
       },
     ],
@@ -455,27 +522,27 @@ export default function EmployeesPage() {
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <Label>First Name</Label>
-                <Input type="text" name="first_name" placeholder="Enter first name" required />
+                <Input type="text" name="first_name" placeholder="Enter first name" />
               </div>
               <div>
                 <Label>Last Name</Label>
-                <Input type="text" name="last_name" placeholder="Enter last name" required />
+                <Input type="text" name="last_name" placeholder="Enter last name" />
               </div>
               <div>
                 <Label>Email</Label>
-                <Input type="email" name="email" placeholder="Enter email address" required />
+                <Input type="email" name="email" placeholder="Enter email address" />
               </div>
               <div>
                 <Label>Password</Label>
-                <Input type="password" name="password" placeholder="Enter password" required />
+                <Input type="password" name="password" placeholder="Enter password" />
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input type="text" name="phone" placeholder="Enter phone number" required />
+                <Input type="text" name="phone" placeholder="Enter phone number" />
               </div>
               <div>
                 <Label>Date of Birth</Label>
-                <Input type="date" name="date_of_birth" required />
+                <Input type="date" name="date_of_birth" />
               </div>
               <div>
                 <Label>Gender</Label>
@@ -493,10 +560,12 @@ export default function EmployeesPage() {
                 <Label>Role</Label>
                 <SelectInput
                   name="role_id"
-                  options={roles.map((role) => ({
-                    value: role.id,
-                    label: role.name.charAt(0).toUpperCase() + role.name.slice(1),
-                  }))}
+                  options={roles
+                    .filter((role) => role.is_active === 1) // Only show active roles when adding
+                    .map((role) => ({
+                      value: role.id,
+                      label: role.name.charAt(0).toUpperCase() + role.name.slice(1),
+                    }))}
                   placeholder="Select role"
                   required
                 />
@@ -511,7 +580,7 @@ export default function EmployeesPage() {
               </div>
               <div>
                 <Label>Salary</Label>
-                <Input type="number" name="salary" placeholder="Enter salary" step={0.01} required />
+                <Input type="number" name="salary" placeholder="Enter salary" step={0.01} />
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-4">
@@ -584,7 +653,7 @@ export default function EmployeesPage() {
                   type="text" 
                   name="phone" 
                   defaultValue={selectedEmployee?.phone || ""} 
-                  required 
+                 
                 />
               </div>
               <div>
@@ -593,7 +662,7 @@ export default function EmployeesPage() {
                   type="date" 
                   name="date_of_birth" 
                   defaultValue={selectedEmployee?.date_of_birth ? new Date(selectedEmployee.date_of_birth).toISOString().split('T')[0] : ""} 
-                  required 
+                 
                 />
               </div>
               <div>
@@ -613,10 +682,17 @@ export default function EmployeesPage() {
                 <Label>Role</Label>
                 <SelectInput
                   name="role_id"
-                  options={roles.map((role) => ({
-                    value: role.id,
-                    label: role.name.charAt(0).toUpperCase() + role.name.slice(1),
-                  }))}
+                  options={roles
+                    .filter((role) => {
+                      // Show active roles OR the current employee's role (even if inactive)
+                      return role.is_active === 1 || role.id === selectedEmployee?.role_id;
+                    })
+                    .map((role) => ({
+                      value: role.id,
+                      label: role.is_active === 1
+                        ? role.name.charAt(0).toUpperCase() + role.name.slice(1)
+                        : `${role.name.charAt(0).toUpperCase() + role.name.slice(1)} (Inactive)`,
+                    }))}
                   placeholder="Select role"
                   defaultValue={selectedEmployee?.role_id !== undefined ? selectedEmployee.role_id : ""}
                   required
@@ -628,26 +704,26 @@ export default function EmployeesPage() {
                   type="text" 
                   name="address" 
                   defaultValue={selectedEmployee?.address || ""} 
-                  required 
+                   
                 />
               </div>
-              <div>
+              <div>       
                 <Label>Hire Date</Label>
                 <Input 
                   type="date" 
                   name="hire_date" 
                   defaultValue={selectedEmployee?.hire_date ? new Date(selectedEmployee.hire_date).toISOString().split('T')[0] : ""} 
-                  required 
+                   
                 />
               </div>
               <div>
-                <Label>Salary</Label>
+                <Label>Salary</Label> 
                 <Input 
                   type="number" 
                   name="salary" 
                   defaultValue={selectedEmployee?.salary ? (selectedEmployee.salary as string | number) : ""} 
                   step={0.01} 
-                  required 
+                   
                 />
               </div>
             </div>

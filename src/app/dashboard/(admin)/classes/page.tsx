@@ -9,6 +9,7 @@ import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { classesApi, Class, CreateClassDTO, UpdateClassDTO } from "@/lib/api/classes";
+import { useToast } from "@/components/ui/toast/ToastProvider";
 
 // Format date helper
 const formatDate = (dateString: string): string => {
@@ -29,6 +30,7 @@ export default function ClassesPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const addModal = useModal();
   const editModal = useModal();
   const viewModal = useModal();
@@ -39,7 +41,7 @@ export default function ClassesPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await classesApi.getAll();
+        const data = await classesApi.getAll({ show_all: false });
         setClasses(data);
       } catch (err: any) {
         console.error("Failed to fetch classes:", err);
@@ -53,7 +55,7 @@ export default function ClassesPage() {
   }, []);
 
   const refetchClasses = async () => {
-    const data = await classesApi.getAll();
+    const data = await classesApi.getAll({ show_all: false });
     setClasses(data);
   };
 
@@ -74,7 +76,10 @@ export default function ClassesPage() {
             cls.id === classId ? { ...cls, is_active: newStatus ? 0 : 1 } : cls
           )
         );
-        alert(err?.message || "Failed to update class status");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to update class status",
+        });
       });
   };
 
@@ -94,7 +99,10 @@ export default function ClassesPage() {
       editModal.openModal();
     } catch (err: any) {
       console.error("Failed to load class details:", err);
-      alert(err?.message || "Failed to load class details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load class details",
+      });
     }
   };
 
@@ -106,7 +114,10 @@ export default function ClassesPage() {
       viewModal.openModal();
     } catch (err: any) {
       console.error("Failed to load class details:", err);
-      alert(err?.message || "Failed to load class details");
+      showToast({
+        type: "error",
+        message: err?.message || "Failed to load class details",
+      });
     }
   };
 
@@ -155,7 +166,10 @@ export default function ClassesPage() {
       } catch (err: any) {
         console.error("Failed to save class:", err);
         setError(err?.message || "Failed to save class");
-        alert(err?.message || "Failed to save class");
+        showToast({
+          type: "error",
+          message: err?.message || "Failed to save class",
+        });
       } finally {
         setIsSaving(false);
       }
@@ -286,7 +300,10 @@ export default function ClassesPage() {
             setClasses((prev) => prev.filter((cls) => cls.id !== classItem.id));
           } catch (err: any) {
             console.error("Failed to delete class:", err);
-            alert(err?.message || "Failed to delete class");
+            showToast({
+              type: "error",
+              message: err?.message || "Failed to delete class",
+            });
           }
         };
 
@@ -296,20 +313,30 @@ export default function ClassesPage() {
     onCopyId: (classItem) => {
       // Copy class code to clipboard
       navigator.clipboard.writeText(classItem.class_code);
-      alert(`Copied: ${classItem.class_code}`);
+      navigator.clipboard.writeText(classItem.class_code);
+      showToast({
+        type: "success",
+        message: `Copied: ${classItem.class_code}`,
+      });
     },
     // Example of custom actions - each page can add their own
     customActions: [
       {
         label: "View Students",
         onClick: (classItem) => {
-          alert(`Viewing students in: ${classItem.class_name}`);
+          showToast({
+            type: "info",
+            message: `Viewing students in: ${classItem.class_name}`,
+          });
         },
       },
       {
         label: "Assign Teacher",
         onClick: (classItem) => {
-          alert(`Assigning teacher to: ${classItem.class_name}`);
+          showToast({
+            type: "info",
+            message: `Assigning teacher to: ${classItem.class_name}`,
+          });
         },
       },
     ],

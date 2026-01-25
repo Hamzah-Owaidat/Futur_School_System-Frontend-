@@ -47,11 +47,29 @@ export interface UpdateEmployeeDTO extends Partial<CreateEmployeeDTO> {
   is_active?: number;
 }
 
+export interface GetEmployeesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role_id?: number;
+  is_active?: boolean;
+  show_all?: boolean;
+}
+
 // Employee API Service
 export const employeeApi = {
   // Get all employees
-  getAll: async (): Promise<Employee[]> => {
-    const response = await api.get("/employees");
+  getAll: async (params?: GetEmployeesParams): Promise<Employee[]> => {
+    const response = await api.get("/employees", {
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search,
+        role_id: params?.role_id,
+        is_active: params?.is_active,
+        show_all: params?.show_all,
+      },
+    });
     const payload: any = response.data;
 
     // Expected shape:
@@ -116,13 +134,24 @@ export const employeeApi = {
     await api.delete(`/employees/${employeeId}`);
   },
 
-  // Update employee status
+  // Update employee status (uses PUT endpoint to update is_active)
   updateStatus: async (employeeId: number, isActive: boolean): Promise<Employee> => {
-    const response = await api.patch<Employee>(`/employees/${employeeId}/status`, {
+    const response = await api.put<Employee>(`/employees/${employeeId}`, {
       is_active: isActive ? 1 : 0,
     });
     const payload: any = response.data;
-    return (payload?.data ?? payload) as Employee;
+    
+    // Handle response structure: { success, message, data: { employee: {...} } }
+    if (payload?.data?.employee) {
+      return payload.data.employee as Employee;
+    }
+    if (payload?.data) {
+      return payload.data as Employee;
+    }
+    if (payload?.employee) {
+      return payload.employee as Employee;
+    }
+    return payload as Employee;
   },
 };
 

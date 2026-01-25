@@ -31,12 +31,21 @@ export default function NotFound() {
           We can’t seem to find the page you are looking for!
         </p>
 
-        <Link
-          href="/"
-          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200"
-        >
-          Back to Home Page
-        </Link>
+        <div className="flex gap-4 justify-center">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200"
+          >
+            Back to Home
+          </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center rounded-lg bg-[#1a7b9b] px-5 py-3.5 text-sm font-medium text-white shadow-theme-xs hover:bg-[#166a86] dark:bg-[#1a7b9b] dark:hover:bg-[#166a86]"
+          >
+            Go to Dashboard
+          </Link>
+        </div>
+        
       </div>
       {/* <!-- Footer --> */}
       <p className="absolute text-sm text-center text-gray-500 -translate-x-1/2 bottom-6 left-1/2 dark:text-gray-400">

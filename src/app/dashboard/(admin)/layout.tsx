@@ -24,7 +24,7 @@ export default function AdminLayout({
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
         if (!token) {
-          router.replace("/signin");
+          router.replace("/auth/signin");
           return;
         }
 
@@ -43,7 +43,7 @@ export default function AdminLayout({
             localStorage.removeItem("token");
             localStorage.removeItem("user");
           }
-          router.replace("/signin");
+          router.replace("/auth/signin");
           return;
         }
       } finally {

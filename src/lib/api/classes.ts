@@ -44,6 +44,9 @@ export interface GetClassesParams {
   search?: string;
   grade_level?: number;
   academic_year?: string;
+  teacher_id?: number;
+  active_only?: boolean;
+  show_all?: boolean;
   is_active?: boolean;
 }
 
@@ -72,6 +75,9 @@ export const classesApi = {
         search: params?.search ?? "",
         grade_level: params?.grade_level,
         academic_year: params?.academic_year,
+        teacher_id: params?.teacher_id,
+        active_only: params?.active_only,
+        show_all: params?.show_all,
         is_active: params?.is_active,
       },
     });

@@ -70,8 +70,9 @@ export const courseNotesApi = {
   },
 
   // GET /api/course-notes/student/:studentId
-  getByStudent: async (studentId: number): Promise<CourseNote[]> => {
-    const response = await api.get<CourseNote[]>(`/course-notes/student/${studentId}`);
+  getByStudent: async (studentId: number, academicYear?: string): Promise<CourseNote[]> => {
+    const params = academicYear ? { academic_year: academicYear } : {};
+    const response = await api.get<CourseNote[]>(`/course-notes/student/${studentId}`, { params });
     const payload: any = response.data;
 
     if (Array.isArray(payload?.data?.course_notes)) {
@@ -94,6 +95,17 @@ export const courseNotesApi = {
   // POST /api/course-notes (upsert)
   upsert: async (data: UpsertCourseNoteDTO): Promise<CourseNote> => {
     const response = await api.post<CourseNote>("/course-notes", data);
+    const payload: any = response.data;
+
+    if (payload?.data?.course_note) return payload.data.course_note as CourseNote;
+    if (payload?.data) return payload.data as CourseNote;
+    if (payload?.course_note) return payload.course_note as CourseNote;
+    return payload as CourseNote;
+  },
+
+  // PUT /api/course-notes/:id
+  update: async (id: number, data: Partial<UpsertCourseNoteDTO>): Promise<CourseNote> => {
+    const response = await api.put<CourseNote>(`/course-notes/${id}`, data);
     const payload: any = response.data;
 
     if (payload?.data?.course_note) return payload.data.course_note as CourseNote;
